@@ -254,8 +254,12 @@ class TestPartStudioManager:
         """Test getting bounding box for a specific part."""
         part_id = "JHD"
         expected_bbox = {
-            "lowX": -0.01, "lowY": -0.02, "lowZ": -0.03,
-            "highX": 0.01, "highY": 0.02, "highZ": 0.03,
+            "lowX": -0.01,
+            "lowY": -0.02,
+            "lowZ": -0.03,
+            "highX": 0.01,
+            "highY": 0.02,
+            "highZ": 0.03,
         }
 
         onshape_client.get = AsyncMock(return_value=expected_bbox)
@@ -299,7 +303,10 @@ class TestPartStudioManager:
                     "id": "JHD",
                     "type": "solid",
                     "faces": [
-                        {"id": "JHW", "surface": {"type": "plane", "normal": {"x": 1, "y": 0, "z": 0}}},
+                        {
+                            "id": "JHW",
+                            "surface": {"type": "plane", "normal": {"x": 1, "y": 0, "z": 0}},
+                        },
                     ],
                 }
             ]

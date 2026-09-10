@@ -76,10 +76,7 @@ class AssemblyManager:
         Returns:
             API response
         """
-        path = (
-            f"/api/v9/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}"
-            f"/instances"
-        )
+        path = f"/api/v9/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/instances"
         if is_assembly:
             data: Dict[str, Any] = {
                 "documentId": document_id,

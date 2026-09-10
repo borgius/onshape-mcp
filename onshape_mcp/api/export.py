@@ -1,4 +1,5 @@
 """Export and translation management for Onshape."""
+
 from typing import Any, Dict, Optional
 from .client import OnshapeClient
 
@@ -31,10 +32,7 @@ class ExportManager:
         Returns:
             Translation/export result with download URL or data
         """
-        path = (
-            f"/api/v11/partstudios/d/{document_id}/w/{workspace_id}"
-            f"/e/{element_id}/translations"
-        )
+        path = f"/api/v11/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/translations"
         data: Dict[str, Any] = {
             "formatName": format_name.upper(),
             "storeInDocument": False,
@@ -62,10 +60,7 @@ class ExportManager:
         Returns:
             Translation/export result
         """
-        path = (
-            f"/api/v11/assemblies/d/{document_id}/w/{workspace_id}"
-            f"/e/{element_id}/translations"
-        )
+        path = f"/api/v11/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/translations"
         data: Dict[str, Any] = {
             "formatName": format_name.upper(),
             "storeInDocument": False,

@@ -278,7 +278,11 @@ class TestReapplyFeatures:
         assert next(p for p in params if p["parameterId"] == "fullFeaturePattern")["value"] is True
 
     def test_circular_defaults_off(self):
-        params = CircularPatternBuilder().add_feature("f1").build(axis_edge_id="e1")["feature"]["parameters"]
+        params = (
+            CircularPatternBuilder()
+            .add_feature("f1")
+            .build(axis_edge_id="e1")["feature"]["parameters"]
+        )
         assert next(p for p in params if p["parameterId"] == "fullFeaturePattern")["value"] is False
 
     def test_circular_set_reapply(self):

@@ -124,9 +124,7 @@ class MateConnectorBuilder:
         self._translation_z = z
         return self
 
-    def set_rotation(
-        self, axis: str = "ABOUT_Z", angle: float = 0.0
-    ) -> "MateConnectorBuilder":
+    def set_rotation(self, axis: str = "ABOUT_Z", angle: float = 0.0) -> "MateConnectorBuilder":
         """Set rotation around an axis.
 
         Enables the transform parameters on the mate connector.
@@ -177,61 +175,69 @@ class MateConnectorBuilder:
         ]
 
         if self._flip_primary:
-            parameters.append({
-                "btType": "BTMParameterBoolean-144",
-                "parameterId": "flipPrimary",
-                "value": True,
-            })
+            parameters.append(
+                {
+                    "btType": "BTMParameterBoolean-144",
+                    "parameterId": "flipPrimary",
+                    "value": True,
+                }
+            )
 
         if self._secondary_axis_type != "PLUS_X":
-            parameters.append({
-                "btType": "BTMParameterEnum-145",
-                "parameterId": "secondaryAxisType",
-                "enumName": "Reorient secondary axis",
-                "value": self._secondary_axis_type,
-            })
+            parameters.append(
+                {
+                    "btType": "BTMParameterEnum-145",
+                    "parameterId": "secondaryAxisType",
+                    "enumName": "Reorient secondary axis",
+                    "value": self._secondary_axis_type,
+                }
+            )
 
         if self._transform_enabled:
             tx_m = self._translation_x * 0.0254
             ty_m = self._translation_y * 0.0254
             tz_m = self._translation_z * 0.0254
-            parameters.append({
-                "btType": "BTMParameterBoolean-144",
-                "parameterId": "transform",
-                "value": True,
-            })
-            parameters.extend([
+            parameters.append(
                 {
-                    "btType": "BTMParameterQuantity-147",
-                    "parameterId": "translationX",
-                    "expression": f"{tx_m} m",
-                    "isInteger": False,
-                },
-                {
-                    "btType": "BTMParameterQuantity-147",
-                    "parameterId": "translationY",
-                    "expression": f"{ty_m} m",
-                    "isInteger": False,
-                },
-                {
-                    "btType": "BTMParameterQuantity-147",
-                    "parameterId": "translationZ",
-                    "expression": f"{tz_m} m",
-                    "isInteger": False,
-                },
-                {
-                    "btType": "BTMParameterEnum-145",
-                    "parameterId": "rotationType",
-                    "enumName": "Rotation axis",
-                    "value": self._rotation_type,
-                },
-                {
-                    "btType": "BTMParameterQuantity-147",
-                    "parameterId": "rotation",
-                    "expression": f"{math.radians(self._rotation_angle)} rad",
-                    "isInteger": False,
-                },
-            ])
+                    "btType": "BTMParameterBoolean-144",
+                    "parameterId": "transform",
+                    "value": True,
+                }
+            )
+            parameters.extend(
+                [
+                    {
+                        "btType": "BTMParameterQuantity-147",
+                        "parameterId": "translationX",
+                        "expression": f"{tx_m} m",
+                        "isInteger": False,
+                    },
+                    {
+                        "btType": "BTMParameterQuantity-147",
+                        "parameterId": "translationY",
+                        "expression": f"{ty_m} m",
+                        "isInteger": False,
+                    },
+                    {
+                        "btType": "BTMParameterQuantity-147",
+                        "parameterId": "translationZ",
+                        "expression": f"{tz_m} m",
+                        "isInteger": False,
+                    },
+                    {
+                        "btType": "BTMParameterEnum-145",
+                        "parameterId": "rotationType",
+                        "enumName": "Rotation axis",
+                        "value": self._rotation_type,
+                    },
+                    {
+                        "btType": "BTMParameterQuantity-147",
+                        "parameterId": "rotation",
+                        "expression": f"{math.radians(self._rotation_angle)} rad",
+                        "isInteger": False,
+                    },
+                ]
+            )
 
         return {
             "feature": {
@@ -353,45 +359,55 @@ class MateBuilder:
 
         if self.min_limit is not None and self.max_limit is not None:
             params = feature_data["feature"]["parameters"]
-            params.append({
-                "btType": "BTMParameterBoolean-144",
-                "parameterId": "limitsEnabled",
-                "value": True,
-            })
+            params.append(
+                {
+                    "btType": "BTMParameterBoolean-144",
+                    "parameterId": "limitsEnabled",
+                    "value": True,
+                }
+            )
             if self.mate_type in (MateType.SLIDER, MateType.CYLINDRICAL):
                 min_m = self.min_limit * 0.0254
                 max_m = self.max_limit * 0.0254
-                params.append({
-                    "btType": "BTMParameterNullableQuantity-807",
-                    "parameterId": "limitZMin",
-                    "expression": f"{min_m} m",
-                    "isInteger": False,
-                    "isNull": False,
-                })
-                params.append({
-                    "btType": "BTMParameterNullableQuantity-807",
-                    "parameterId": "limitZMax",
-                    "expression": f"{max_m} m",
-                    "isInteger": False,
-                    "isNull": False,
-                })
+                params.append(
+                    {
+                        "btType": "BTMParameterNullableQuantity-807",
+                        "parameterId": "limitZMin",
+                        "expression": f"{min_m} m",
+                        "isInteger": False,
+                        "isNull": False,
+                    }
+                )
+                params.append(
+                    {
+                        "btType": "BTMParameterNullableQuantity-807",
+                        "parameterId": "limitZMax",
+                        "expression": f"{max_m} m",
+                        "isInteger": False,
+                        "isNull": False,
+                    }
+                )
             elif self.mate_type == MateType.REVOLUTE:
                 min_rad = math.radians(self.min_limit)
                 max_rad = math.radians(self.max_limit)
-                params.append({
-                    "btType": "BTMParameterNullableQuantity-807",
-                    "parameterId": "limitAxialZMin",
-                    "expression": f"{min_rad} rad",
-                    "isInteger": False,
-                    "isNull": False,
-                })
-                params.append({
-                    "btType": "BTMParameterNullableQuantity-807",
-                    "parameterId": "limitAxialZMax",
-                    "expression": f"{max_rad} rad",
-                    "isInteger": False,
-                    "isNull": False,
-                })
+                params.append(
+                    {
+                        "btType": "BTMParameterNullableQuantity-807",
+                        "parameterId": "limitAxialZMin",
+                        "expression": f"{min_rad} rad",
+                        "isInteger": False,
+                        "isNull": False,
+                    }
+                )
+                params.append(
+                    {
+                        "btType": "BTMParameterNullableQuantity-807",
+                        "parameterId": "limitAxialZMax",
+                        "expression": f"{max_rad} rad",
+                        "isInteger": False,
+                        "isNull": False,
+                    }
+                )
 
         return feature_data
 
@@ -451,8 +467,20 @@ def build_transform_matrix(
 
     # 4x4 matrix in row-major order
     return [
-        r00, r01, r02, tx_m,
-        r10, r11, r12, ty_m,
-        r20, r21, r22, tz_m,
-        0.0, 0.0, 0.0, 1.0,
+        r00,
+        r01,
+        r02,
+        tx_m,
+        r10,
+        r11,
+        r12,
+        ty_m,
+        r20,
+        r21,
+        r22,
+        tz_m,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
     ]

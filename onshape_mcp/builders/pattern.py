@@ -178,7 +178,9 @@ class CircularPatternBuilder:
         self.count = count
         return self
 
-    def set_angle(self, angle: float, variable_name: Optional[str] = None) -> "CircularPatternBuilder":
+    def set_angle(
+        self, angle: float, variable_name: Optional[str] = None
+    ) -> "CircularPatternBuilder":
         """Set the total angle spread for the pattern (degrees)."""
         self.angle = angle
         self.angle_variable = variable_name
@@ -220,9 +222,7 @@ class CircularPatternBuilder:
         if not axis_edge_id:
             raise ValueError("axis_edge_id is required (create an axis construction line first)")
 
-        angle_expression = (
-            f"#{self.angle_variable}" if self.angle_variable else f"{self.angle} deg"
-        )
+        angle_expression = f"#{self.angle_variable}" if self.angle_variable else f"{self.angle} deg"
 
         return {
             "btType": "BTFeatureDefinitionCall-1406",

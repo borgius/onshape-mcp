@@ -98,12 +98,7 @@ class TestChamferBuilder:
         assert width_param["expression"] == "#d"
 
     def test_method_chaining(self):
-        chamfer = (
-            ChamferBuilder(name="Chained")
-            .set_distance(0.4)
-            .add_edge("e1")
-            .add_edge("e2")
-        )
+        chamfer = ChamferBuilder(name="Chained").set_distance(0.4).add_edge("e1").add_edge("e2")
         assert chamfer.name == "Chained"
         assert chamfer.distance == 0.4
         assert len(chamfer.edge_queries) == 2

@@ -85,10 +85,22 @@ def build_absolute_translation_matrix(
         16-element row-major 4x4 matrix
     """
     return [
-        1.0, 0.0, 0.0, x_inches * INCHES_TO_METERS,
-        0.0, 1.0, 0.0, y_inches * INCHES_TO_METERS,
-        0.0, 0.0, 1.0, z_inches * INCHES_TO_METERS,
-        0.0, 0.0, 0.0, 1.0,
+        1.0,
+        0.0,
+        0.0,
+        x_inches * INCHES_TO_METERS,
+        0.0,
+        1.0,
+        0.0,
+        y_inches * INCHES_TO_METERS,
+        0.0,
+        0.0,
+        1.0,
+        z_inches * INCHES_TO_METERS,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
     ]
 
 
@@ -116,9 +128,7 @@ def compute_aligned_position(
         ValueError: If face is not a valid face name
     """
     if face not in FACE_NAMES:
-        raise ValueError(
-            f"Invalid face '{face}'. Must be one of: {sorted(FACE_NAMES)}"
-        )
+        raise ValueError(f"Invalid face '{face}'. Must be one of: {sorted(FACE_NAMES)}")
 
     cur_x, cur_y, cur_z = source_current_pos_meters
 
@@ -334,9 +344,7 @@ async def align_to_face(
     """
     face = face.lower().strip()
     if face not in FACE_NAMES:
-        raise ValueError(
-            f"Invalid face '{face}'. Must be one of: {sorted(FACE_NAMES)}"
-        )
+        raise ValueError(f"Invalid face '{face}'. Must be one of: {sorted(FACE_NAMES)}")
 
     assembly_data = await assembly_manager.get_assembly_definition(
         document_id, workspace_id, element_id
@@ -356,13 +364,9 @@ async def align_to_face(
             target_inst = inst
 
     if source_inst is None:
-        raise ValueError(
-            f"Source instance '{source_instance_id}' not found in assembly"
-        )
+        raise ValueError(f"Source instance '{source_instance_id}' not found in assembly")
     if target_inst is None:
-        raise ValueError(
-            f"Target instance '{target_instance_id}' not found in assembly"
-        )
+        raise ValueError(f"Target instance '{target_instance_id}' not found in assembly")
 
     # Get bounding boxes
     def _bbox_params(inst):

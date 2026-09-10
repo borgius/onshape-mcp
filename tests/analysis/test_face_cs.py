@@ -116,13 +116,7 @@ class TestExtractMCCoordinateSystem:
         assert cs is None
 
     def test_returns_none_when_feature_has_no_matedCS(self):
-        assembly_data = {
-            "rootAssembly": {
-                "features": [
-                    {"featureId": "mc_no_cs", "name": "test"}
-                ]
-            }
-        }
+        assembly_data = {"rootAssembly": {"features": [{"featureId": "mc_no_cs", "name": "test"}]}}
         cs = extract_mc_coordinate_system(assembly_data, "mc_no_cs")
         assert cs is None
 
@@ -182,9 +176,7 @@ class TestQueryFaceCoordinateSystem:
     @pytest.mark.asyncio
     async def test_creates_reads_deletes(self):
         manager = AsyncMock()
-        manager.add_feature.return_value = {
-            "feature": {"featureId": "temp_mc_id"}
-        }
+        manager.add_feature.return_value = {"feature": {"featureId": "temp_mc_id"}}
         manager.get_assembly_definition.return_value = {
             "rootAssembly": {
                 "features": [
@@ -222,9 +214,7 @@ class TestQueryFaceCoordinateSystem:
     @pytest.mark.asyncio
     async def test_passes_correct_params_to_get_assembly(self):
         manager = AsyncMock()
-        manager.add_feature.return_value = {
-            "feature": {"featureId": "temp_id"}
-        }
+        manager.add_feature.return_value = {"feature": {"featureId": "temp_id"}}
         manager.get_assembly_definition.return_value = {
             "rootAssembly": {
                 "features": [
@@ -242,9 +232,7 @@ class TestQueryFaceCoordinateSystem:
         }
         manager.delete_feature.return_value = {}
 
-        await query_face_coordinate_system(
-            manager, "d", "w", "e", "i", "face"
-        )
+        await query_face_coordinate_system(manager, "d", "w", "e", "i", "face")
 
         call_args = manager.get_assembly_definition.call_args
         assert call_args[1]["params"]["includeMateFeatures"] is True
@@ -253,19 +241,13 @@ class TestQueryFaceCoordinateSystem:
     @pytest.mark.asyncio
     async def test_cleanup_on_extraction_failure(self):
         manager = AsyncMock()
-        manager.add_feature.return_value = {
-            "feature": {"featureId": "temp_mc"}
-        }
+        manager.add_feature.return_value = {"feature": {"featureId": "temp_mc"}}
         # Return data that doesn't contain the MC's coordinate system
-        manager.get_assembly_definition.return_value = {
-            "rootAssembly": {"features": []}
-        }
+        manager.get_assembly_definition.return_value = {"rootAssembly": {"features": []}}
         manager.delete_feature.return_value = {}
 
         with pytest.raises(RuntimeError, match="Could not find resolved coordinate system"):
-            await query_face_coordinate_system(
-                manager, "d", "w", "e", "i", "face"
-            )
+            await query_face_coordinate_system(manager, "d", "w", "e", "i", "face")
 
         # Verify cleanup still happened
         manager.delete_feature.assert_called_once_with("d", "w", "e", "temp_mc")
@@ -273,16 +255,12 @@ class TestQueryFaceCoordinateSystem:
     @pytest.mark.asyncio
     async def test_cleanup_on_api_error(self):
         manager = AsyncMock()
-        manager.add_feature.return_value = {
-            "feature": {"featureId": "temp_mc"}
-        }
+        manager.add_feature.return_value = {"feature": {"featureId": "temp_mc"}}
         manager.get_assembly_definition.side_effect = Exception("API error")
         manager.delete_feature.return_value = {}
 
         with pytest.raises(Exception, match="API error"):
-            await query_face_coordinate_system(
-                manager, "d", "w", "e", "i", "face"
-            )
+            await query_face_coordinate_system(manager, "d", "w", "e", "i", "face")
 
         # Verify cleanup still happened despite the error
         manager.delete_feature.assert_called_once_with("d", "w", "e", "temp_mc")
@@ -293,16 +271,12 @@ class TestQueryFaceCoordinateSystem:
         manager.add_feature.return_value = {"feature": {}}
 
         with pytest.raises(RuntimeError, match="Failed to create temporary mate connector"):
-            await query_face_coordinate_system(
-                manager, "d", "w", "e", "i", "face"
-            )
+            await query_face_coordinate_system(manager, "d", "w", "e", "i", "face")
 
     @pytest.mark.asyncio
     async def test_delete_failure_is_logged_not_raised(self):
         manager = AsyncMock()
-        manager.add_feature.return_value = {
-            "feature": {"featureId": "temp_mc"}
-        }
+        manager.add_feature.return_value = {"feature": {"featureId": "temp_mc"}}
         manager.get_assembly_definition.return_value = {
             "rootAssembly": {
                 "features": [
@@ -321,8 +295,6 @@ class TestQueryFaceCoordinateSystem:
         manager.delete_feature.side_effect = Exception("Delete failed")
 
         # Should NOT raise - delete failure is logged as warning
-        cs = await query_face_coordinate_system(
-            manager, "d", "w", "e", "i", "face"
-        )
+        cs = await query_face_coordinate_system(manager, "d", "w", "e", "i", "face")
         assert cs is not None
         assert cs.z_axis == (0.0, 0.0, 1.0)
