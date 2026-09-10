@@ -75,11 +75,16 @@ class TestRevolveBuilder:
     def test_build_requires_sketch(self):
         revolve = RevolveBuilder()
         with pytest.raises(ValueError, match="Sketch feature ID must be set"):
+            revolve.build(axis_edge_id="edge1")
+
+    def test_build_requires_axis_edge(self):
+        revolve = RevolveBuilder(sketch_feature_id="sketch1")
+        with pytest.raises(ValueError, match="axis_edge_id is required"):
             revolve.build()
 
     def test_build_structure(self):
         revolve = RevolveBuilder(name="TestRevolve", sketch_feature_id="sketch1")
-        result = revolve.build()
+        result = revolve.build(axis_edge_id="edge1")
 
         assert result["btType"] == "BTFeatureDefinitionCall-1406"
         feature = result["feature"]
@@ -89,51 +94,60 @@ class TestRevolveBuilder:
 
     def test_build_entities_parameter(self):
         revolve = RevolveBuilder(sketch_feature_id="sketch1")
-        result = revolve.build()
+        result = revolve.build(axis_edge_id="edge1")
         params = result["feature"]["parameters"]
 
         entities = next(p for p in params if p["parameterId"] == "entities")
         assert entities["queries"][0]["btType"] == "BTMIndividualSketchRegionQuery-140"
-        assert "sketch1" in entities["queries"][0]["queryString"]
+        assert entities["queries"][0]["featureId"] == "sketch1"
 
-    def test_build_axis_mapping(self):
-        for axis, expected in [("X", "RIGHT"), ("Y", "TOP"), ("Z", "FRONT")]:
-            revolve = RevolveBuilder(sketch_feature_id="s1", axis=axis)
-            result = revolve.build()
-            params = result["feature"]["parameters"]
-            axis_param = next(p for p in params if p["parameterId"] == "axis")
-            assert expected in axis_param["queries"][0]["queryString"]
+    def test_build_axis_uses_supplied_edge(self):
+        revolve = RevolveBuilder(sketch_feature_id="s1", axis="X")
+        result = revolve.build(axis_edge_id="axisEdge42")
+        params = result["feature"]["parameters"]
+        axis_param = next(p for p in params if p["parameterId"] == "axis")
+        assert axis_param["queries"][0]["deterministicIds"] == ["axisEdge42"]
+
+    def test_build_full_revolve_omits_angle(self):
+        revolve = RevolveBuilder(sketch_feature_id="s1", angle=360.0)
+        result = revolve.build(axis_edge_id="edge1")
+        params = result["feature"]["parameters"]
+
+        full = next(p for p in params if p["parameterId"] == "fullRevolve")
+        assert full["value"] is True
+        assert not any(p["parameterId"] == "angle" for p in params)
 
     def test_build_angle_without_variable(self):
         revolve = RevolveBuilder(sketch_feature_id="s1", angle=180.0)
-        result = revolve.build()
+        result = revolve.build(axis_edge_id="edge1")
         params = result["feature"]["parameters"]
 
-        angle_param = next(p for p in params if p["parameterId"] == "revolveAngle")
+        assert next(p for p in params if p["parameterId"] == "fullRevolve")["value"] is False
+        angle_param = next(p for p in params if p["parameterId"] == "angle")
         assert angle_param["expression"] == "180.0 deg"
         assert angle_param["value"] == 180.0
 
     def test_build_angle_with_variable(self):
         revolve = RevolveBuilder(sketch_feature_id="s1")
         revolve.set_angle(90.0, variable_name="a")
-        result = revolve.build()
+        result = revolve.build(axis_edge_id="edge1")
         params = result["feature"]["parameters"]
 
-        angle_param = next(p for p in params if p["parameterId"] == "revolveAngle")
+        angle_param = next(p for p in params if p["parameterId"] == "angle")
         assert angle_param["expression"] == "#a"
 
     def test_build_operation_types(self):
         for op in RevolveType:
             revolve = RevolveBuilder(sketch_feature_id="s1", operation_type=op)
-            result = revolve.build()
+            result = revolve.build(axis_edge_id="edge1")
             params = result["feature"]["parameters"]
             op_param = next(p for p in params if p["parameterId"] == "operationType")
             assert op_param["value"] == op.value
 
     def test_build_opposite_direction(self):
-        revolve = RevolveBuilder(sketch_feature_id="s1")
+        revolve = RevolveBuilder(sketch_feature_id="s1", angle=180.0)
         revolve.set_opposite_direction(True)
-        result = revolve.build()
+        result = revolve.build(axis_edge_id="edge1")
         params = result["feature"]["parameters"]
 
         opp_param = next(p for p in params if p["parameterId"] == "oppositeDirection")

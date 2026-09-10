@@ -92,7 +92,9 @@ class ThickenBuilder:
         else:
             thickness_expr = f"{self.thickness_value} in"
 
-        # Build the feature data
+        # Build the feature data. Must be wrapped in a BTFeatureDefinitionCall-1406
+        # envelope like every other builder, otherwise Onshape rejects the POST with
+        # "Could not resolve type id 'BTMFeature-134' as a subtype of BTFeatureDefinitionCall".
         feature = {
             "btType": "BTMFeature-134",
             "name": self.name,
@@ -143,4 +145,4 @@ class ThickenBuilder:
             ],
         }
 
-        return feature
+        return {"btType": "BTFeatureDefinitionCall-1406", "feature": feature}

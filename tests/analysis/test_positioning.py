@@ -52,11 +52,7 @@ class TestExtractOccurrenceTransforms:
         assert result == {}
 
     def test_missing_transform_uses_identity(self):
-        data = {
-            "rootAssembly": {
-                "occurrences": [{"path": ["inst1"]}]
-            }
-        }
+        data = {"rootAssembly": {"occurrences": [{"path": ["inst1"]}]}}
         result = extract_occurrence_transforms(data)
         assert result["inst1"] == [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 
@@ -81,10 +77,22 @@ class TestBuildAbsoluteTranslationMatrix:
     def test_zero_position(self):
         result = build_absolute_translation_matrix(0, 0, 0)
         assert result == [
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
         ]
 
     def test_converts_inches_to_meters(self):
@@ -264,8 +272,12 @@ class TestGetAssemblyPositions:
 
     def _make_instance(self, inst_id, name, part_id, elem_id="e1", doc_id="d"):
         return {
-            "id": inst_id, "name": name, "type": "Part",
-            "documentId": doc_id, "elementId": elem_id, "partId": part_id,
+            "id": inst_id,
+            "name": name,
+            "type": "Part",
+            "documentId": doc_id,
+            "elementId": elem_id,
+            "partId": part_id,
         }
 
     def _make_occurrence(self, inst_id, tx=0, ty=0, tz=0):
@@ -277,8 +289,12 @@ class TestGetAssemblyPositions:
     def _inch_bbox(self, lx, ly, lz, hx, hy, hz):
         m = 0.0254
         return {
-            "lowX": lx * m, "lowY": ly * m, "lowZ": lz * m,
-            "highX": hx * m, "highY": hy * m, "highZ": hz * m,
+            "lowX": lx * m,
+            "lowY": ly * m,
+            "lowZ": lz * m,
+            "highX": hx * m,
+            "highY": hy * m,
+            "highZ": hz * m,
         }
 
     @pytest.mark.asyncio
@@ -357,7 +373,8 @@ class TestGetAssemblyPositions:
         mock_ps = AsyncMock()
 
         mock_asm.get_assembly_definition.return_value = self._make_assembly_data(
-            instances=[], occurrences=[],
+            instances=[],
+            occurrences=[],
         )
 
         result = await get_assembly_positions(mock_asm, mock_ps, "d", "w", "e")
@@ -414,8 +431,12 @@ class TestAlignToFace:
 
     def _make_instance(self, inst_id, name, part_id, elem_id="e1", doc_id="d"):
         return {
-            "id": inst_id, "name": name, "type": "Part",
-            "documentId": doc_id, "elementId": elem_id, "partId": part_id,
+            "id": inst_id,
+            "name": name,
+            "type": "Part",
+            "documentId": doc_id,
+            "elementId": elem_id,
+            "partId": part_id,
         }
 
     def _make_occurrence(self, inst_id, tx=0, ty=0, tz=0):
@@ -426,8 +447,12 @@ class TestAlignToFace:
 
     def _meter_bbox(self, lx, ly, lz, hx, hy, hz):
         return {
-            "lowX": lx, "lowY": ly, "lowZ": lz,
-            "highX": hx, "highY": hy, "highZ": hz,
+            "lowX": lx,
+            "lowY": ly,
+            "lowZ": lz,
+            "highX": hx,
+            "highY": hy,
+            "highZ": hz,
         }
 
     @pytest.mark.asyncio
@@ -453,9 +478,7 @@ class TestAlignToFace:
         ]
         mock_asm.transform_occurrences.return_value = {}
 
-        result = await align_to_face(
-            mock_asm, mock_ps, "d", "w", "e", "door", "side", "front"
-        )
+        result = await align_to_face(mock_asm, mock_ps, "d", "w", "e", "door", "side", "front")
 
         # Side front face (min Y) = -0.4064m
         # Door should be placed so its high_y (0) touches side's low_y (-0.4064)
@@ -481,9 +504,7 @@ class TestAlignToFace:
         )
 
         with pytest.raises(ValueError, match="Source instance"):
-            await align_to_face(
-                mock_asm, mock_ps, "d", "w", "e", "missing", "target", "front"
-            )
+            await align_to_face(mock_asm, mock_ps, "d", "w", "e", "missing", "target", "front")
 
     @pytest.mark.asyncio
     async def test_target_not_found_raises(self):
@@ -496,9 +517,7 @@ class TestAlignToFace:
         )
 
         with pytest.raises(ValueError, match="Target instance"):
-            await align_to_face(
-                mock_asm, mock_ps, "d", "w", "e", "source", "missing", "front"
-            )
+            await align_to_face(mock_asm, mock_ps, "d", "w", "e", "source", "missing", "front")
 
     @pytest.mark.asyncio
     async def test_invalid_face_raises(self):
@@ -514,9 +533,7 @@ class TestAlignToFace:
         )
 
         with pytest.raises(ValueError, match="Invalid face"):
-            await align_to_face(
-                mock_asm, mock_ps, "d", "w", "e", "s", "t", "diagonal"
-            )
+            await align_to_face(mock_asm, mock_ps, "d", "w", "e", "s", "t", "diagonal")
 
     @pytest.mark.asyncio
     async def test_preserves_unchanged_axes(self):
@@ -540,15 +557,13 @@ class TestAlignToFace:
         ]
         mock_asm.transform_occurrences.return_value = {}
 
-        await align_to_face(
-            mock_asm, mock_ps, "d", "w", "e", "src", "tgt", "front"
-        )
+        await align_to_face(mock_asm, mock_ps, "d", "w", "e", "src", "tgt", "front")
 
         call_args = mock_asm.transform_occurrences.call_args
         transform = call_args[0][3][0]["transform"]
         # X and Z should be unchanged from source position
-        assert transform[3] == pytest.approx(0.254)   # X preserved
-        assert transform[11] == pytest.approx(0.127)   # Z preserved
+        assert transform[3] == pytest.approx(0.254)  # X preserved
+        assert transform[11] == pytest.approx(0.127)  # Z preserved
 
     @pytest.mark.asyncio
     async def test_returns_confirmation_message(self):
@@ -571,9 +586,7 @@ class TestAlignToFace:
         ]
         mock_asm.transform_occurrences.return_value = {}
 
-        result = await align_to_face(
-            mock_asm, mock_ps, "d", "w", "e", "s", "t", "back"
-        )
+        result = await align_to_face(mock_asm, mock_ps, "d", "w", "e", "s", "t", "back")
 
         assert "Aligned" in result
         assert "Door" in result

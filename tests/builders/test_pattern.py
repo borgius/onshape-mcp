@@ -81,23 +81,25 @@ class TestLinearPatternBuilder:
         assert feature["featureType"] == "linearPattern"
         assert feature["name"] == "TestLP"
 
-    def test_build_entities_parameter(self):
+    def test_build_instance_function_parameter(self):
         lp = LinearPatternBuilder()
         lp.add_feature("f1").add_feature("f2")
         result = lp.build()
         params = result["feature"]["parameters"]
 
-        entities = next(p for p in params if p["parameterId"] == "entities")
-        assert entities["queries"][0]["deterministicIds"] == ["f1", "f2"]
+        inst = next(p for p in params if p["parameterId"] == "instanceFunction")
+        assert inst["btType"] == "BTMParameterFeatureList-1749"
+        assert inst["featureIds"] == ["f1", "f2"]
 
     def test_build_direction_mapping(self):
-        for axis, expected in [("X", "RIGHT"), ("Y", "TOP"), ("Z", "FRONT")]:
+        for axis, expected in [("X", "Right"), ("Y", "Front"), ("Z", "Top")]:
             lp = LinearPatternBuilder()
             lp.add_feature("f1").set_direction(axis)
             result = lp.build()
             params = result["feature"]["parameters"]
-            dir_param = next(p for p in params if p["parameterId"] == "directionQuery")
+            dir_param = next(p for p in params if p["parameterId"] == "directionOne")
             assert expected in dir_param["queries"][0]["queryString"]
+            assert "EntityType.FACE" in dir_param["queries"][0]["queryString"]
 
     def test_build_distance_without_variable(self):
         lp = LinearPatternBuilder(distance=2.5)
@@ -190,12 +192,18 @@ class TestCircularPatternBuilder:
     def test_build_requires_features(self):
         cp = CircularPatternBuilder()
         with pytest.raises(ValueError, match="At least one feature must be added"):
+            cp.build(axis_edge_id="e1")
+
+    def test_build_requires_axis_edge(self):
+        cp = CircularPatternBuilder()
+        cp.add_feature("f1")
+        with pytest.raises(ValueError, match="axis_edge_id is required"):
             cp.build()
 
     def test_build_structure(self):
         cp = CircularPatternBuilder(name="TestCP")
         cp.add_feature("f1")
-        result = cp.build()
+        result = cp.build(axis_edge_id="e1")
 
         assert result["btType"] == "BTFeatureDefinitionCall-1406"
         feature = result["feature"]
@@ -203,19 +211,18 @@ class TestCircularPatternBuilder:
         assert feature["featureType"] == "circularPattern"
         assert feature["name"] == "TestCP"
 
-    def test_build_axis_mapping(self):
-        for axis, expected in [("X", "RIGHT"), ("Y", "TOP"), ("Z", "FRONT")]:
-            cp = CircularPatternBuilder()
-            cp.add_feature("f1").set_axis(axis)
-            result = cp.build()
-            params = result["feature"]["parameters"]
-            axis_param = next(p for p in params if p["parameterId"] == "axisQuery")
-            assert expected in axis_param["queries"][0]["queryString"]
+    def test_build_axis_uses_supplied_edge(self):
+        cp = CircularPatternBuilder()
+        cp.add_feature("f1").set_axis("Y")
+        result = cp.build(axis_edge_id="axisEdge7")
+        params = result["feature"]["parameters"]
+        axis_param = next(p for p in params if p["parameterId"] == "axis")
+        assert axis_param["queries"][0]["deterministicIds"] == ["axisEdge7"]
 
     def test_build_angle_without_variable(self):
         cp = CircularPatternBuilder()
         cp.add_feature("f1")
-        result = cp.build()
+        result = cp.build(axis_edge_id="e1")
         params = result["feature"]["parameters"]
 
         angle = next(p for p in params if p["parameterId"] == "angle")
@@ -225,7 +232,7 @@ class TestCircularPatternBuilder:
         cp = CircularPatternBuilder()
         cp.set_angle(180.0, variable_name="ang")
         cp.add_feature("f1")
-        result = cp.build()
+        result = cp.build(axis_edge_id="e1")
         params = result["feature"]["parameters"]
 
         angle = next(p for p in params if p["parameterId"] == "angle")
@@ -234,7 +241,7 @@ class TestCircularPatternBuilder:
     def test_build_count_parameter(self):
         cp = CircularPatternBuilder(count=6)
         cp.add_feature("f1")
-        result = cp.build()
+        result = cp.build(axis_edge_id="e1")
         params = result["feature"]["parameters"]
 
         count_param = next(p for p in params if p["parameterId"] == "instanceCount")
@@ -253,3 +260,32 @@ class TestCircularPatternBuilder:
         assert cp.angle == 270.0
         assert cp.axis == "Y"
         assert len(cp.feature_queries) == 1
+
+
+class TestReapplyFeatures:
+    """fullFeaturePattern ("Reapply features") is off by default and settable on both builders."""
+
+    def test_linear_defaults_off(self):
+        params = LinearPatternBuilder().add_feature("f1").build()["feature"]["parameters"]
+        flag = next(p for p in params if p["parameterId"] == "fullFeaturePattern")
+        assert flag["btType"] == "BTMParameterBoolean-144"
+        assert flag["value"] is False
+
+    def test_linear_set_reapply(self):
+        lp = LinearPatternBuilder().add_feature("f1")
+        assert lp.set_reapply_features() is lp
+        params = lp.build()["feature"]["parameters"]
+        assert next(p for p in params if p["parameterId"] == "fullFeaturePattern")["value"] is True
+
+    def test_circular_defaults_off(self):
+        params = (
+            CircularPatternBuilder()
+            .add_feature("f1")
+            .build(axis_edge_id="e1")["feature"]["parameters"]
+        )
+        assert next(p for p in params if p["parameterId"] == "fullFeaturePattern")["value"] is False
+
+    def test_circular_set_reapply(self):
+        cp = CircularPatternBuilder().add_feature("f1").set_reapply_features(True)
+        params = cp.build(axis_edge_id="e1")["feature"]["parameters"]
+        assert next(p for p in params if p["parameterId"] == "fullFeaturePattern")["value"] is True

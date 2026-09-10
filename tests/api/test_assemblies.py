@@ -68,9 +68,7 @@ class TestAssemblyManager:
         assert call_args[1]["data"] == {"name": assembly_name}
 
     @pytest.mark.asyncio
-    async def test_add_instance_part(
-        self, assembly_manager, onshape_client, sample_document_ids
-    ):
+    async def test_add_instance_part(self, assembly_manager, onshape_client, sample_document_ids):
         """Test adding a specific part instance to an assembly."""
         part_studio_element_id = "ps_elem_abc"
         part_id = "JHD"
@@ -250,9 +248,7 @@ class TestAssemblyManager:
         assert body["isRelative"] is True
 
     @pytest.mark.asyncio
-    async def test_add_feature_success(
-        self, assembly_manager, onshape_client, sample_document_ids
-    ):
+    async def test_add_feature_success(self, assembly_manager, onshape_client, sample_document_ids):
         """Test adding a feature (mate, mate connector, etc.) to an assembly."""
         feature_data = {
             "btType": "BTMAssemblyFeature-1174",

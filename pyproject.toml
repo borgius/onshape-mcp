@@ -1,6 +1,6 @@
 [project]
 name = "onshape-mcp"
-version = "0.3.0"
+version = "0.4.0"
 description = "Enhanced MCP server for programmatic CAD modeling with Onshape"
 authors = [
     {name = "hedless", email = "your-email@example.com"}
@@ -8,7 +8,7 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=0.1.0",
+    "mcp>=1.2,<2",  # 2.x removed the low-level Server.list_tools() decorator this repo uses
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
@@ -40,6 +40,11 @@ target-version = ['py310']
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint]
+# Pin the rule set explicitly. ruff 0.16 changed its defaults, and CI installs the
+# latest ruff, so without this the lint step reports hundreds of pre-existing findings.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.ruff.lint.per-file-ignores]
 # load_dotenv() must run before local imports read env vars

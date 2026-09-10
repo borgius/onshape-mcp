@@ -65,8 +65,22 @@ def sample_feature_response():
 
 @pytest.fixture
 def sample_variables():
-    """Provide sample variable data."""
+    """Provide sample variable data in the shape the Onshape API returns.
+
+    getVariables returns a list of variable-table groups (one per Variable Studio
+    reference), each holding a ``variables`` array.
+    """
     return [
-        {"name": "width", "expression": "10 in", "description": "Width of the part"},
-        {"name": "height", "expression": "5 in", "description": "Height of the part"},
+        {
+            "variableStudioReference": None,
+            "variables": [
+                {
+                    "name": "width",
+                    "expression": "10 in",
+                    "type": "LENGTH",
+                    "description": "Width of the part",
+                },
+                {"name": "height", "expression": "5 in", "type": "LENGTH"},
+            ],
+        }
     ]

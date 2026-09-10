@@ -120,7 +120,7 @@ class TestThickenBuilder:
         thicken = ThickenBuilder(name="BasicThicken", sketch_feature_id="sketch123")
         thicken.set_thickness(0.5)
 
-        result = thicken.build()
+        result = thicken.build()["feature"]  # unwrap BTFeatureDefinitionCall-1406 envelope
 
         # Verify top-level structure
         assert result["btType"] == "BTMFeature-134"
@@ -134,7 +134,7 @@ class TestThickenBuilder:
         thicken = ThickenBuilder(name="VarThicken", sketch_feature_id="sketch123")
         thicken.set_thickness(0.75, variable_name="wall_thickness")
 
-        result = thicken.build()
+        result = thicken.build()["feature"]  # unwrap BTFeatureDefinitionCall-1406 envelope
         parameters = result["parameters"]
 
         # Find thickness parameter
@@ -148,7 +148,7 @@ class TestThickenBuilder:
         thicken = ThickenBuilder(name="Test", sketch_feature_id="sketch1")
         thicken.set_thickness(1.25)
 
-        result = thicken.build()
+        result = thicken.build()["feature"]  # unwrap BTFeatureDefinitionCall-1406 envelope
         parameters = result["parameters"]
 
         thickness_param = next(p for p in parameters if p["parameterId"] == "thickness1")
@@ -161,7 +161,7 @@ class TestThickenBuilder:
         )
         thicken.set_thickness(0.5)
 
-        result = thicken.build()
+        result = thicken.build()["feature"]  # unwrap BTFeatureDefinitionCall-1406 envelope
         parameters = result["parameters"]
 
         op_param = next(p for p in parameters if p["parameterId"] == "operationType")
@@ -176,7 +176,7 @@ class TestThickenBuilder:
         thicken = ThickenBuilder(name="Test", sketch_feature_id=sketch_id)
         thicken.set_thickness(0.5)
 
-        result = thicken.build()
+        result = thicken.build()["feature"]  # unwrap BTFeatureDefinitionCall-1406 envelope
         parameters = result["parameters"]
 
         entities_param = next(p for p in parameters if p["parameterId"] == "entities")
@@ -196,7 +196,7 @@ class TestThickenBuilder:
         thicken = ThickenBuilder(name="Test", sketch_feature_id="sketch1")
         thicken.set_thickness(0.5).set_midplane(True)
 
-        result = thicken.build()
+        result = thicken.build()["feature"]  # unwrap BTFeatureDefinitionCall-1406 envelope
         parameters = result["parameters"]
 
         midplane_param = next(p for p in parameters if p["parameterId"] == "midplane")
@@ -209,7 +209,7 @@ class TestThickenBuilder:
         thicken = ThickenBuilder(name="Test", sketch_feature_id="sketch1")
         thicken.set_thickness(0.5).set_opposite_direction(True)
 
-        result = thicken.build()
+        result = thicken.build()["feature"]  # unwrap BTFeatureDefinitionCall-1406 envelope
         parameters = result["parameters"]
 
         opposite_param = next(p for p in parameters if p["parameterId"] == "oppositeDirection")
@@ -222,7 +222,7 @@ class TestThickenBuilder:
         thicken = ThickenBuilder(name="Test", sketch_feature_id="sketch1")
         thicken.set_thickness(0.5)
 
-        result = thicken.build()
+        result = thicken.build()["feature"]  # unwrap BTFeatureDefinitionCall-1406 envelope
         parameters = result["parameters"]
 
         midplane_param = next(p for p in parameters if p["parameterId"] == "midplane")
@@ -233,7 +233,7 @@ class TestThickenBuilder:
         thicken = ThickenBuilder(name="Test", sketch_feature_id="sketch1")
         thicken.set_thickness(0.5)
 
-        result = thicken.build()
+        result = thicken.build()["feature"]  # unwrap BTFeatureDefinitionCall-1406 envelope
         parameters = result["parameters"]
 
         opposite_param = next(p for p in parameters if p["parameterId"] == "oppositeDirection")
@@ -244,7 +244,7 @@ class TestThickenBuilder:
         thicken = ThickenBuilder(name="Test", sketch_feature_id="sketch1")
         thicken.set_thickness(0.5)
 
-        result = thicken.build()
+        result = thicken.build()["feature"]  # unwrap BTFeatureDefinitionCall-1406 envelope
         parameters = result["parameters"]
 
         thickness2_param = next(p for p in parameters if p["parameterId"] == "thickness2")
@@ -265,7 +265,7 @@ class TestThickenBuilder:
             .set_opposite_direction(False)
         )
 
-        result = thicken.build()
+        result = thicken.build()["feature"]  # unwrap BTFeatureDefinitionCall-1406 envelope
 
         # Verify structure
         assert result["btType"] == "BTMFeature-134"

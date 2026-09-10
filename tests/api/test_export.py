@@ -101,9 +101,7 @@ class TestExportManager:
         assert body["formatName"] == "STL"
 
     @pytest.mark.asyncio
-    async def test_get_translation_status(
-        self, export_manager, onshape_client
-    ):
+    async def test_get_translation_status(self, export_manager, onshape_client):
         """Test checking the status of a translation by ID."""
         translation_id = "trans_id_abc123"
         expected_response = {

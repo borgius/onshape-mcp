@@ -1,4 +1,5 @@
 """FeatureScript evaluation for Onshape."""
+
 from typing import Any, Dict
 from .client import OnshapeClient
 
@@ -30,10 +31,7 @@ class FeatureScriptManager:
         Returns:
             Evaluation result
         """
-        path = (
-            f"/api/v8/partstudios/d/{document_id}/w/{workspace_id}"
-            f"/e/{element_id}/featurescript"
-        )
+        path = f"/api/v8/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/featurescript"
         data = {
             "script": script,
         }

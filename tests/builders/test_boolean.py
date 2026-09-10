@@ -9,9 +9,10 @@ class TestBooleanType:
     """Test BooleanType enum."""
 
     def test_boolean_type_values(self):
+        # member names keep the short spelling; values are Onshape's enum strings
         assert BooleanType.UNION.value == "UNION"
-        assert BooleanType.SUBTRACT.value == "SUBTRACT"
-        assert BooleanType.INTERSECT.value == "INTERSECT"
+        assert BooleanType.SUBTRACT.value == "SUBTRACTION"
+        assert BooleanType.INTERSECT.value == "INTERSECTION"
 
 
 class TestBooleanBuilder:
@@ -46,90 +47,73 @@ class TestBooleanBuilder:
         assert result is b
         assert b.target_body_queries == ["target1"]
 
-    def test_build_requires_tool_bodies(self):
-        b = BooleanBuilder()
-        with pytest.raises(ValueError, match="At least one tool body must be added"):
+    def test_build_union_requires_two_bodies(self):
+        b = BooleanBuilder(boolean_type=BooleanType.UNION)
+        b.add_tool_body("only1")
+        with pytest.raises(ValueError, match="needs at least two bodies"):
             b.build()
 
-    def test_build_subtract_requires_target(self):
+    def test_build_intersect_requires_two_bodies(self):
+        b = BooleanBuilder(boolean_type=BooleanType.INTERSECT)
+        b.add_tool_body("only1")
+        with pytest.raises(ValueError, match="needs at least two bodies"):
+            b.build()
+
+    def test_build_subtract_requires_tool_and_target(self):
         b = BooleanBuilder(boolean_type=BooleanType.SUBTRACT)
         b.add_tool_body("tool1")
-        with pytest.raises(ValueError, match="At least one target body"):
+        with pytest.raises(ValueError, match="tool body and one target body"):
             b.build()
-
-    def test_build_intersect_requires_target(self):
-        b = BooleanBuilder(boolean_type=BooleanType.INTERSECT)
-        b.add_tool_body("tool1")
-        with pytest.raises(ValueError, match="At least one target body"):
-            b.build()
-
-    def test_build_union_does_not_require_target(self):
-        b = BooleanBuilder(boolean_type=BooleanType.UNION)
-        b.add_tool_body("tool1")
-        result = b.build()
-        assert result is not None
 
     def test_build_structure(self):
         b = BooleanBuilder(name="TestBool")
-        b.add_tool_body("tool1")
+        b.add_tool_body("tool1").add_tool_body("tool2")
         result = b.build()
 
         assert result["btType"] == "BTFeatureDefinitionCall-1406"
         feature = result["feature"]
         assert feature["btType"] == "BTMFeature-134"
-        assert feature["featureType"] == "boolean"
+        assert feature["featureType"] == "booleanBodies"
         assert feature["name"] == "TestBool"
 
-    def test_build_boolean_type_parameter(self):
-        for bt in BooleanType:
+    def test_build_operation_type_parameter(self):
+        cases = [
+            (BooleanType.UNION, "UNION"),
+            (BooleanType.SUBTRACT, "SUBTRACTION"),
+            (BooleanType.INTERSECT, "INTERSECTION"),
+        ]
+        for bt, expected in cases:
             b = BooleanBuilder(boolean_type=bt)
             b.add_tool_body("tool1")
-            if bt != BooleanType.UNION:
+            if bt == BooleanType.SUBTRACT:
                 b.add_target_body("target1")
-            result = b.build()
-            params = result["feature"]["parameters"]
-            type_param = next(
-                p for p in params if p["parameterId"] == "booleanOperationType"
-            )
-            assert type_param["value"] == bt.value
+            else:
+                b.add_tool_body("tool2")
+            params = b.build()["feature"]["parameters"]
+            type_param = next(p for p in params if p["parameterId"] == "operationType")
+            assert type_param["value"] == expected
 
-    def test_build_tools_parameter(self):
-        b = BooleanBuilder()
+    def test_build_union_merges_all_bodies_into_tools(self):
+        b = BooleanBuilder(boolean_type=BooleanType.UNION)
         b.add_tool_body("t1").add_tool_body("t2")
-        result = b.build()
-        params = result["feature"]["parameters"]
+        b.add_target_body("t3")
+        params = b.build()["feature"]["parameters"]
 
         tools = next(p for p in params if p["parameterId"] == "tools")
-        assert tools["queries"][0]["deterministicIds"] == ["t1", "t2"]
+        assert tools["queries"][0]["deterministicIds"] == ["t1", "t2", "t3"]
+        assert not any(p["parameterId"] == "targets" for p in params)
 
-    def test_build_with_targets(self):
+    def test_build_subtract_keeps_tools_and_targets_separate(self):
         b = BooleanBuilder(boolean_type=BooleanType.SUBTRACT)
-        b.add_tool_body("tool1")
-        b.add_target_body("tgt1").add_target_body("tgt2")
-        result = b.build()
-        params = result["feature"]["parameters"]
+        b.add_tool_body("cut1")
+        b.add_target_body("keep1").add_target_body("keep2")
+        params = b.build()["feature"]["parameters"]
 
+        tools = next(p for p in params if p["parameterId"] == "tools")
         targets = next(p for p in params if p["parameterId"] == "targets")
-        assert targets["queries"][0]["deterministicIds"] == ["tgt1", "tgt2"]
-
-    def test_build_union_without_targets_has_no_targets_param(self):
-        b = BooleanBuilder(boolean_type=BooleanType.UNION)
-        b.add_tool_body("tool1")
-        result = b.build()
-        params = result["feature"]["parameters"]
-
-        target_params = [p for p in params if p["parameterId"] == "targets"]
-        assert len(target_params) == 0
-
-    def test_build_union_with_optional_targets(self):
-        b = BooleanBuilder(boolean_type=BooleanType.UNION)
-        b.add_tool_body("tool1")
-        b.add_target_body("tgt1")
-        result = b.build()
-        params = result["feature"]["parameters"]
-
-        target_params = [p for p in params if p["parameterId"] == "targets"]
-        assert len(target_params) == 1
+        assert tools["queries"][0]["deterministicIds"] == ["cut1"]
+        assert targets["queries"][0]["deterministicIds"] == ["keep1", "keep2"]
+        assert any(p["parameterId"] == "keepTools" for p in params)
 
     def test_method_chaining(self):
         b = (
