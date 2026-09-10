@@ -41,6 +41,11 @@ def _resolve_view_matrix(view: str) -> str:
 def _extract_image_bytes(response: Dict[str, Any]) -> bytes:
     """Extract and decode the first image from a BTShadedViewsInfo response.
 
+    The OpenAPI schema declares ``images`` as a list of lists of strings, but the
+    live API returns a flat list of base64 strings (observed 2026-09-10). Accept
+    both shapes; iterating a string as if it were a row would otherwise hand
+    single characters to the base64 decoder.
+
     Args:
         response: Raw JSON response from a `/shadedviews` endpoint.
 
@@ -51,8 +56,9 @@ def _extract_image_bytes(response: Dict[str, Any]) -> bytes:
         ValueError: If the response contains no image data.
     """
     images = response.get("images") or []
-    for row in images:
-        for encoded in row or []:
+    for entry in images:
+        candidates = [entry] if isinstance(entry, str) else (entry or [])
+        for encoded in candidates:
             if encoded:
                 return base64.b64decode(encoded)
     raise ValueError("Onshape shaded-view response contained no image data")

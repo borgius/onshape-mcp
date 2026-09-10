@@ -17,7 +17,8 @@ FAKE_PNG_B64 = base64.b64encode(FAKE_PNG_BYTES).decode()
 
 
 def _shaded_view_response(encoded: str = FAKE_PNG_B64):
-    return {"images": [[encoded]]}
+    # Shape the live API actually returns: a flat list of base64 strings.
+    return {"images": [encoded]}
 
 
 class TestResolveViewMatrix:
@@ -42,6 +43,13 @@ class TestExtractImageBytes:
     def test_extracts_first_image(self):
         response = _shaded_view_response()
         assert _extract_image_bytes(response) == FAKE_PNG_BYTES
+
+    def test_extracts_first_image_from_nested_rows(self):
+        """The OpenAPI schema's list-of-lists shape must keep working too."""
+        assert _extract_image_bytes({"images": [[FAKE_PNG_B64]]}) == FAKE_PNG_BYTES
+
+    def test_skips_empty_entries(self):
+        assert _extract_image_bytes({"images": ["", [], [FAKE_PNG_B64]]}) == FAKE_PNG_BYTES
 
     def test_raises_on_empty_images(self):
         with pytest.raises(ValueError):
