@@ -22,6 +22,7 @@ class ExtrudeBuilder:
         sketch_feature_id: Optional[str] = None,
         depth: float = 1.0,
         operation_type: ExtrudeType = ExtrudeType.NEW,
+        opposite_direction: bool = False,
     ):
         """Initialize extrude builder.
 
@@ -30,11 +31,14 @@ class ExtrudeBuilder:
             sketch_feature_id: ID of the sketch to extrude
             depth: Extrude depth in inches
             operation_type: Type of extrude operation
+            opposite_direction: Extrude away from the sketch plane's default
+                normal direction instead of along it
         """
         self.name = name
         self.sketch_feature_id = sketch_feature_id
         self.depth = depth
         self.operation_type = operation_type
+        self.opposite_direction = opposite_direction
         self.depth_variable: Optional[str] = None
 
     def set_depth(self, depth: float, variable_name: Optional[str] = None) -> "ExtrudeBuilder":
@@ -49,6 +53,18 @@ class ExtrudeBuilder:
         """
         self.depth = depth
         self.depth_variable = variable_name
+        return self
+
+    def set_opposite_direction(self, opposite: bool = True) -> "ExtrudeBuilder":
+        """Set whether to extrude in the opposite direction.
+
+        Args:
+            opposite: True to extrude opposite the sketch plane's default normal
+
+        Returns:
+            Self for method chaining
+        """
+        self.opposite_direction = opposite
         return self
 
     def set_sketch(self, sketch_feature_id: str) -> "ExtrudeBuilder":
@@ -117,7 +133,7 @@ class ExtrudeBuilder:
                     },
                     {
                         "btType": "BTMParameterBoolean-144",
-                        "value": False,
+                        "value": self.opposite_direction,
                         "parameterId": "oppositeDirection",
                         "parameterName": "",
                     },

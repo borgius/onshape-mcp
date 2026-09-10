@@ -151,6 +151,11 @@ async def list_tools() -> list[Tool]:
                         "description": "Extrude operation type",
                         "default": "NEW",
                     },
+                    "oppositeDirection": {
+                        "type": "boolean",
+                        "description": "Extrude away from the sketch plane's default normal direction instead of along it",
+                        "default": False,
+                    },
                 },
                 "required": ["documentId", "workspaceId", "elementId", "sketchFeatureId", "depth"],
             },
@@ -1257,6 +1262,9 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             )
 
             extrude.set_depth(arguments["depth"], variable_name=arguments.get("variableDepth"))
+
+            if arguments.get("oppositeDirection"):
+                extrude.set_opposite_direction(True)
 
             # Add feature to Part Studio
             feature_data = extrude.build()

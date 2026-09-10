@@ -195,6 +195,18 @@ class TestExtrudeBuilder:
         assert opposite_param["btType"] == "BTMParameterBoolean-144"
         assert opposite_param["value"] is False
 
+    def test_set_opposite_direction(self):
+        """Test that set_opposite_direction() flips the build() parameter."""
+        extrude = ExtrudeBuilder(sketch_feature_id="sketch1")
+        result = extrude.set_opposite_direction(True)
+
+        assert result is extrude
+        assert extrude.opposite_direction is True
+
+        parameters = extrude.build()["feature"]["parameters"]
+        opposite_param = next(p for p in parameters if p["parameterId"] == "oppositeDirection")
+        assert opposite_param["value"] is True
+
     def test_build_all_operation_types(self):
         """Test build() with all operation types."""
         operation_types = [

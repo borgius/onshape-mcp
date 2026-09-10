@@ -315,6 +315,33 @@ class TestCreateExtrude:
 
     @pytest.mark.asyncio
     @patch("onshape_mcp.server.partstudio_manager")
+    async def test_create_extrude_with_opposite_direction(self, mock_partstudio):
+        """Test extrude creation with oppositeDirection set."""
+        mock_partstudio.add_feature = AsyncMock(return_value={"featureId": "extrude123"})
+
+        arguments = {
+            "documentId": "doc123",
+            "workspaceId": "workspace123",
+            "elementId": "element123",
+            "sketchFeatureId": "sketch123",
+            "depth": 5.0,
+            "oppositeDirection": True,
+        }
+
+        result = await call_tool("create_extrude", arguments)
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        feature_data = mock_partstudio.add_feature.call_args[0][3]
+        opposite_param = next(
+            p
+            for p in feature_data["feature"]["parameters"]
+            if p["parameterId"] == "oppositeDirection"
+        )
+        assert opposite_param["value"] is True
+
+    @pytest.mark.asyncio
+    @patch("onshape_mcp.server.partstudio_manager")
     async def test_create_extrude_with_operation_type(self, mock_partstudio):
         """Test extrude creation with different operation types."""
         mock_partstudio.add_feature = AsyncMock(return_value={"featureId": "extrude123"})
