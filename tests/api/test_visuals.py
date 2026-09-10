@@ -88,6 +88,7 @@ class TestVisualsManager:
         assert params["viewMatrix"] == ISOMETRIC_VIEW_MATRIX
         assert params["outputWidth"] == 800
         assert params["outputHeight"] == 600
+        assert params["pixelSize"] == 0
 
     @pytest.mark.asyncio
     async def test_capture_part_studio_named_view(

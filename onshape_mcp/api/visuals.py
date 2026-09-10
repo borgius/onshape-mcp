@@ -72,6 +72,7 @@ class VisualsManager:
         output_height: int,
         show_all_parts: bool,
         use_anti_aliasing: bool,
+        pixel_size: float,
         extra_params: Optional[Dict[str, Any]] = None,
     ) -> bytes:
         params: Dict[str, Any] = {
@@ -80,6 +81,9 @@ class VisualsManager:
             "outputHeight": output_height,
             "showAllParts": show_all_parts,
             "useAntiAliasing": use_anti_aliasing,
+            # 0 = scale the model to fit the output dimensions. Onshape's default is
+            # 0.003 m/pixel, which crops large models and shrinks small ones to a dot.
+            "pixelSize": pixel_size,
         }
         if extra_params:
             params.update(extra_params)
@@ -96,6 +100,7 @@ class VisualsManager:
         output_height: int = 600,
         show_all_parts: bool = True,
         use_anti_aliasing: bool = True,
+        pixel_size: float = 0,
         output_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Capture a shaded-view screenshot of a Part Studio.
@@ -110,6 +115,8 @@ class VisualsManager:
             output_height: Image height in pixels
             show_all_parts: Show all parts regardless of visibility settings
             use_anti_aliasing: Smooth model boundaries (slower to render)
+            pixel_size: Meters represented by each pixel; 0 (default) fits the
+                model to the output image dimensions
             output_path: Optional local file path to also save the PNG to
 
         Returns:
@@ -117,7 +124,7 @@ class VisualsManager:
         """
         path = f"/api/v10/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/shadedviews"
         image_bytes = await self._capture(
-            path, view, output_width, output_height, show_all_parts, use_anti_aliasing
+            path, view, output_width, output_height, show_all_parts, use_anti_aliasing, pixel_size
         )
         return self._build_result(image_bytes, output_path)
 
@@ -131,6 +138,7 @@ class VisualsManager:
         output_height: int = 600,
         show_all_parts: bool = True,
         use_anti_aliasing: bool = True,
+        pixel_size: float = 0,
         output_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Capture a shaded-view screenshot of an Assembly.
@@ -145,6 +153,8 @@ class VisualsManager:
             output_height: Image height in pixels
             show_all_parts: Show all parts regardless of visibility settings
             use_anti_aliasing: Smooth model boundaries (slower to render)
+            pixel_size: Meters represented by each pixel; 0 (default) fits the
+                model to the output image dimensions
             output_path: Optional local file path to also save the PNG to
 
         Returns:
@@ -152,7 +162,7 @@ class VisualsManager:
         """
         path = f"/api/v10/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/shadedviews"
         image_bytes = await self._capture(
-            path, view, output_width, output_height, show_all_parts, use_anti_aliasing
+            path, view, output_width, output_height, show_all_parts, use_anti_aliasing, pixel_size
         )
         return self._build_result(image_bytes, output_path)
 
