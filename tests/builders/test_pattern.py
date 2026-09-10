@@ -260,3 +260,28 @@ class TestCircularPatternBuilder:
         assert cp.angle == 270.0
         assert cp.axis == "Y"
         assert len(cp.feature_queries) == 1
+
+
+class TestReapplyFeatures:
+    """fullFeaturePattern ("Reapply features") is off by default and settable on both builders."""
+
+    def test_linear_defaults_off(self):
+        params = LinearPatternBuilder().add_feature("f1").build()["feature"]["parameters"]
+        flag = next(p for p in params if p["parameterId"] == "fullFeaturePattern")
+        assert flag["btType"] == "BTMParameterBoolean-144"
+        assert flag["value"] is False
+
+    def test_linear_set_reapply(self):
+        lp = LinearPatternBuilder().add_feature("f1")
+        assert lp.set_reapply_features() is lp
+        params = lp.build()["feature"]["parameters"]
+        assert next(p for p in params if p["parameterId"] == "fullFeaturePattern")["value"] is True
+
+    def test_circular_defaults_off(self):
+        params = CircularPatternBuilder().add_feature("f1").build(axis_edge_id="e1")["feature"]["parameters"]
+        assert next(p for p in params if p["parameterId"] == "fullFeaturePattern")["value"] is False
+
+    def test_circular_set_reapply(self):
+        cp = CircularPatternBuilder().add_feature("f1").set_reapply_features(True)
+        params = cp.build(axis_edge_id="e1")["feature"]["parameters"]
+        assert next(p for p in params if p["parameterId"] == "fullFeaturePattern")["value"] is True

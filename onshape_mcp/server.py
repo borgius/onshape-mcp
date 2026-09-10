@@ -411,8 +411,8 @@ async def list_tools() -> list[Tool]:
                     },
                     "isPublic": {
                         "type": "boolean",
-                        "description": "Whether the document should be public",
-                        "default": False,
+                        "description": "Whether the document should be public. Defaults to true: free Onshape accounts can only create public documents and get HTTP 409 otherwise",
+                        "default": True,
                     },
                 },
                 "required": ["name"],
@@ -804,6 +804,11 @@ async def list_tools() -> list[Tool]:
                         "description": "Pattern direction axis",
                         "default": "X",
                     },
+                    "reapplyFeatures": {
+                        "type": "boolean",
+                        "description": "Re-run the patterned features per instance (Onshape's 'Reapply features'). Turn on if the pattern fails with PATTERN_SWITCH_TO_PER_INSTANCE because the patterned body was later filleted, chamfered or booleaned",
+                        "default": False,
+                    },
                 },
                 "required": ["documentId", "workspaceId", "elementId", "featureIds", "distance"],
             },
@@ -830,6 +835,11 @@ async def list_tools() -> list[Tool]:
                         "enum": ["X", "Y", "Z"],
                         "description": "Pattern axis",
                         "default": "Z",
+                    },
+                    "reapplyFeatures": {
+                        "type": "boolean",
+                        "description": "Re-run the patterned features per instance (Onshape's 'Reapply features'). Turn on if the pattern fails with PATTERN_SWITCH_TO_PER_INSTANCE because the patterned body was later filleted, chamfered or booleaned",
+                        "default": False,
                     },
                 },
                 "required": ["documentId", "workspaceId", "elementId", "featureIds", "count"],
@@ -1872,7 +1882,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             doc = await document_manager.create_document(
                 name=arguments["name"],
                 description=arguments.get("description"),
-                is_public=arguments.get("isPublic", False),
+                is_public=arguments.get("isPublic", True),
             )
 
             return [
@@ -2269,6 +2279,8 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             for fid in arguments["featureIds"]:
                 pattern.add_feature(fid)
             pattern.set_direction(arguments.get("direction", "X"))
+            if arguments.get("reapplyFeatures"):
+                pattern.set_reapply_features(True)
             feature_data = pattern.build()
             result = await partstudio_manager.add_feature(
                 arguments["documentId"], arguments["workspaceId"], arguments["elementId"], feature_data,
@@ -2288,6 +2300,8 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             )
             pattern.set_angle(arguments.get("angle", 360.0))
             pattern.set_axis(arguments.get("axis", "Z"))
+            if arguments.get("reapplyFeatures"):
+                pattern.set_reapply_features(True)
             for fid in arguments["featureIds"]:
                 pattern.add_feature(fid)
             axis_edge_id = await _create_axis_edge(
