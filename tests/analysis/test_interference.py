@@ -124,8 +124,12 @@ class TestBoundingBoxFromAPI:
 
     def test_parses_api_response(self):
         api_data = {
-            "lowX": -0.01, "lowY": -0.02, "lowZ": -0.03,
-            "highX": 0.01, "highY": 0.02, "highZ": 0.03,
+            "lowX": -0.01,
+            "lowY": -0.02,
+            "lowZ": -0.03,
+            "highX": 0.01,
+            "highY": 0.02,
+            "highZ": 0.03,
         }
         bbox = BoundingBox.from_api_response(api_data)
         assert bbox.low_x == -0.01
@@ -145,9 +149,7 @@ class TestFormatInterferenceResult:
         result = InterferenceResult(
             total_instances=2,
             total_pairs_checked=1,
-            overlaps=[
-                OverlapInfo("Part A", "id_a", "Part B", "id_b", 0.75, 0.5, 24.0, 9.0)
-            ],
+            overlaps=[OverlapInfo("Part A", "id_a", "Part B", "id_b", 0.75, 0.5, 24.0, 9.0)],
         )
         text = format_interference_result(result)
         assert "FOUND 1 OVERLAP" in text
@@ -167,12 +169,10 @@ class TestFormatInterferenceResult:
         result = InterferenceResult(
             total_instances=2,
             total_pairs_checked=1,
-            overlaps=[
-                OverlapInfo("A", "a", "B", "b", 0.5, 10.0, 20.0, 100.0)
-            ],
+            overlaps=[OverlapInfo("A", "a", "B", "b", 0.5, 10.0, 20.0, 100.0)],
         )
         text = format_interference_result(result)
-        assert "0.500\" along X" in text
+        assert '0.500" along X' in text
 
 
 class TestCheckAssemblyInterference:
@@ -183,8 +183,12 @@ class TestCheckAssemblyInterference:
 
     def _make_instance(self, inst_id, name, part_id, elem_id="e1", doc_id="d"):
         return {
-            "id": inst_id, "name": name, "type": "Part",
-            "documentId": doc_id, "elementId": elem_id, "partId": part_id,
+            "id": inst_id,
+            "name": name,
+            "type": "Part",
+            "documentId": doc_id,
+            "elementId": elem_id,
+            "partId": part_id,
         }
 
     def _make_occurrence(self, inst_id, tx=0, ty=0, tz=0):
@@ -197,8 +201,12 @@ class TestCheckAssemblyInterference:
         """Create bbox API response from inch values (converted to meters)."""
         m = 0.0254
         return {
-            "lowX": lx * m, "lowY": ly * m, "lowZ": lz * m,
-            "highX": hx * m, "highY": hy * m, "highZ": hz * m,
+            "lowX": lx * m,
+            "lowY": ly * m,
+            "lowZ": lz * m,
+            "highX": hx * m,
+            "highY": hy * m,
+            "highZ": hz * m,
         }
 
     @pytest.mark.asyncio

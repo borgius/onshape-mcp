@@ -36,6 +36,7 @@ class LinearPatternBuilder:
         self.distance_variable: Optional[str] = None
         self.feature_queries: List[str] = []
         self.direction_axis = "X"
+        self.reapply_features = False
 
     def set_distance(
         self, distance: float, variable_name: Optional[str] = None
@@ -53,6 +54,17 @@ class LinearPatternBuilder:
     def add_feature(self, feature_id: str) -> "LinearPatternBuilder":
         """Add a feature to pattern by its deterministic ID."""
         self.feature_queries.append(feature_id)
+        return self
+
+    def set_reapply_features(self, reapply: bool = True) -> "LinearPatternBuilder":
+        """Re-run the patterned features per instance ("Reapply features" in the UI).
+
+        Onshape's default copies the features' resulting bodies. If those bodies were
+        modified by later features (fillet, chamfer, boolean...), regeneration fails
+        with PATTERN_SWITCH_TO_PER_INSTANCE; enabling this makes each instance re-execute
+        the original features instead.
+        """
+        self.reapply_features = reapply
         return self
 
     def set_direction(self, axis: str) -> "LinearPatternBuilder":
@@ -129,6 +141,12 @@ class LinearPatternBuilder:
                         "parameterId": "instanceCount",
                         "parameterName": "",
                     },
+                    {
+                        "btType": "BTMParameterBoolean-144",
+                        "value": self.reapply_features,
+                        "parameterId": "fullFeaturePattern",
+                        "parameterName": "",
+                    },
                 ],
             },
         }
@@ -153,13 +171,16 @@ class CircularPatternBuilder:
         self.angle_variable: Optional[str] = None
         self.feature_queries: List[str] = []
         self.axis = "Z"
+        self.reapply_features = False
 
     def set_count(self, count: int) -> "CircularPatternBuilder":
         """Set the number of pattern instances (including the original)."""
         self.count = count
         return self
 
-    def set_angle(self, angle: float, variable_name: Optional[str] = None) -> "CircularPatternBuilder":
+    def set_angle(
+        self, angle: float, variable_name: Optional[str] = None
+    ) -> "CircularPatternBuilder":
         """Set the total angle spread for the pattern (degrees)."""
         self.angle = angle
         self.angle_variable = variable_name
@@ -168,6 +189,17 @@ class CircularPatternBuilder:
     def add_feature(self, feature_id: str) -> "CircularPatternBuilder":
         """Add a feature to pattern by its deterministic ID."""
         self.feature_queries.append(feature_id)
+        return self
+
+    def set_reapply_features(self, reapply: bool = True) -> "CircularPatternBuilder":
+        """Re-run the patterned features per instance ("Reapply features" in the UI).
+
+        Onshape's default copies the features' resulting bodies. If those bodies were
+        modified by later features (fillet, chamfer, boolean...), regeneration fails
+        with PATTERN_SWITCH_TO_PER_INSTANCE; enabling this makes each instance re-execute
+        the original features instead.
+        """
+        self.reapply_features = reapply
         return self
 
     def set_axis(self, axis: str) -> "CircularPatternBuilder":
@@ -190,9 +222,7 @@ class CircularPatternBuilder:
         if not axis_edge_id:
             raise ValueError("axis_edge_id is required (create an axis construction line first)")
 
-        angle_expression = (
-            f"#{self.angle_variable}" if self.angle_variable else f"{self.angle} deg"
-        )
+        angle_expression = f"#{self.angle_variable}" if self.angle_variable else f"{self.angle} deg"
 
         return {
             "btType": "BTFeatureDefinitionCall-1406",
@@ -250,6 +280,12 @@ class CircularPatternBuilder:
                         "btType": "BTMParameterBoolean-144",
                         "value": True,
                         "parameterId": "equalSpace",
+                        "parameterName": "",
+                    },
+                    {
+                        "btType": "BTMParameterBoolean-144",
+                        "value": self.reapply_features,
+                        "parameterId": "fullFeaturePattern",
                         "parameterName": "",
                     },
                 ],

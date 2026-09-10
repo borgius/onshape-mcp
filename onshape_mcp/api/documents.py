@@ -274,14 +274,16 @@ class DocumentManager:
         return elements
 
     async def create_document(
-        self, name: str, description: Optional[str] = None, is_public: bool = False
+        self, name: str, description: Optional[str] = None, is_public: bool = True
     ) -> DocumentInfo:
         """Create a new Onshape document.
 
         Args:
             name: Name for the new document
             description: Optional description
-            is_public: Whether the document should be public
+            is_public: Whether the document should be public. Defaults to True
+                because free Onshape accounts can only create public documents
+                (a private request fails with HTTP 409).
 
         Returns:
             DocumentInfo for the created document

@@ -80,3 +80,6 @@ dev_scripts/
 .worktrees/
 .security-key
 logs/security/
+
+# Coverage output (also written by pytest-cov)
+coverage.json

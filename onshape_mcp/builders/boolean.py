@@ -67,17 +67,13 @@ class BooleanBuilder:
 
         if is_subtract:
             if not self.tool_body_queries or not self.target_body_queries:
-                raise ValueError(
-                    "SUBTRACT needs at least one tool body and one target body"
-                )
+                raise ValueError("SUBTRACT needs at least one tool body and one target body")
             tools = list(self.tool_body_queries)
         else:
             # UNION / INTERSECT: everything goes in as tools.
             tools = list(self.tool_body_queries) + list(self.target_body_queries)
             if len(tools) < 2:
-                raise ValueError(
-                    f"{self.boolean_type.name} needs at least two bodies"
-                )
+                raise ValueError(f"{self.boolean_type.name} needs at least two bodies")
 
         parameters: List[Dict[str, Any]] = [
             {

@@ -39,9 +39,7 @@ class TestMateConnectorBuilder:
         assert mc._transform_enabled is False
 
     def test_initialization_with_custom_values(self):
-        mc = MateConnectorBuilder(
-            name="MC1", face_id="JHW", occurrence_path=["inst1"]
-        )
+        mc = MateConnectorBuilder(name="MC1", face_id="JHW", occurrence_path=["inst1"])
         assert mc.name == "MC1"
         assert mc.face_id == "JHW"
         assert mc.occurrence_path == ["inst1"]
@@ -112,9 +110,7 @@ class TestMateConnectorBuilder:
         assert mc._secondary_axis_type == "PLUS_Y"
 
     def test_build_structure(self):
-        mc = MateConnectorBuilder(
-            name="TestMC", face_id="JHW", occurrence_path=["inst1"]
-        )
+        mc = MateConnectorBuilder(name="TestMC", face_id="JHW", occurrence_path=["inst1"])
         result = mc.build()
 
         assert "feature" in result
@@ -299,9 +295,7 @@ class TestMateBuilder:
         result = mb.build()
         params = result["feature"]["parameters"]
 
-        connector_list = next(
-            p for p in params if p["parameterId"] == "mateConnectorsQuery"
-        )
+        connector_list = next(p for p in params if p["parameterId"] == "mateConnectorsQuery")
         assert connector_list["btType"] == "BTMParameterQueryWithOccurrenceList-67"
         assert len(connector_list["queries"]) == 2
 
@@ -323,10 +317,22 @@ class TestBuildTransformMatrix:
     def test_identity_transform(self):
         matrix = build_transform_matrix()
         expected = [
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
         ]
         for actual, exp in zip(matrix, expected):
             assert abs(actual - exp) < 1e-10

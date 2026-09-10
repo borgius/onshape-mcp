@@ -107,8 +107,12 @@ def get_world_aabb(local_bbox: BoundingBox, transform: List[float]) -> BoundingB
     zs = [p[2] for p in transformed]
 
     return BoundingBox(
-        low_x=min(xs), low_y=min(ys), low_z=min(zs),
-        high_x=max(xs), high_y=max(ys), high_z=max(zs),
+        low_x=min(xs),
+        low_y=min(ys),
+        low_z=min(zs),
+        high_x=max(xs),
+        high_y=max(ys),
+        high_z=max(zs),
     )
 
 
@@ -275,10 +279,7 @@ def format_interference_result(result: InterferenceResult) -> str:
             lines.append(f"Warning: {w}")
         lines.append("")
 
-    lines.append(
-        f"Checked {result.total_instances} instances "
-        f"({result.total_pairs_checked} pairs)"
-    )
+    lines.append(f"Checked {result.total_instances} instances ({result.total_pairs_checked} pairs)")
     lines.append("")
 
     if not result.overlaps:
@@ -287,31 +288,23 @@ def format_interference_result(result: InterferenceResult) -> str:
         lines.append(f"FOUND {len(result.overlaps)} OVERLAP(S):")
         lines.append("")
         for i, ov in enumerate(result.overlaps, 1):
+            lines.append(f'Overlap {i}: "{ov.instance_a_name}" and "{ov.instance_b_name}"')
             lines.append(
-                f'Overlap {i}: "{ov.instance_a_name}" and "{ov.instance_b_name}"'
+                f'  Penetration: X={ov.overlap_x_inches:.3f}", '
+                f'Y={ov.overlap_y_inches:.3f}", '
+                f'Z={ov.overlap_z_inches:.3f}"'
             )
-            lines.append(
-                f"  Penetration: X={ov.overlap_x_inches:.3f}\", "
-                f"Y={ov.overlap_y_inches:.3f}\", "
-                f"Z={ov.overlap_z_inches:.3f}\""
-            )
-            lines.append(
-                f"  Overlap volume: {ov.overlap_volume_cubic_inches:.3f} cubic inches"
-            )
+            lines.append(f"  Overlap volume: {ov.overlap_volume_cubic_inches:.3f} cubic inches")
 
             # Suggest fix along axis with smallest overlap
-            min_val = min(
-                ov.overlap_x_inches, ov.overlap_y_inches, ov.overlap_z_inches
-            )
+            min_val = min(ov.overlap_x_inches, ov.overlap_y_inches, ov.overlap_z_inches)
             if min_val == ov.overlap_x_inches:
                 axis = "X"
             elif min_val == ov.overlap_y_inches:
                 axis = "Y"
             else:
                 axis = "Z"
-            lines.append(
-                f"  Suggestion: Move one part {min_val:.3f}\" along {axis} to resolve"
-            )
+            lines.append(f'  Suggestion: Move one part {min_val:.3f}" along {axis} to resolve')
             lines.append("")
 
     lines.append("")
