@@ -50,6 +50,17 @@ python run_mcp_server.py
 
 **Important**: Replace `/absolute/path/to/onshape-mcp` with the actual absolute path to your cloned repository.
 
+### Optional: keep credentials in a gpg-encrypted file
+
+If your editor or MCP client makes environment variables awkward to set, `scripts/run-with-creds.sh` decrypts them at start-up instead. Put the two lines below in a file, encrypt it (`gpg -e -a -o ~/.credentials/onshape.env.asc creds.env`), and point `mcp.json` at the script as the command:
+
+```
+ONSHAPE_ACCESS_KEY=xxxxxxxx
+ONSHAPE_SECRET_KEY=yyyyyyyy
+```
+
+The script uses the active virtualenv, else the repo's `.venv`, else `python3`; override with `ONSHAPE_MCP_PYTHON`, and the file location with `ONSHAPE_CREDS_GPG`.
+
 ## Development Workflow
 
 ### When Making Changes:

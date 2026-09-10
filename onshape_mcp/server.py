@@ -205,27 +205,46 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
-            name="get_variables",
-            description="Get all variables from a Part Studio variable table",
+            name="create_variable_studio",
+            description="Create a new Variable Studio in a document. Variables defined there are shared across all Part Studios in the document and referenced in expressions as #variable_name.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "documentId": {"type": "string", "description": "Document ID"},
                     "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
+                    "name": {"type": "string", "description": "Name for the new Variable Studio"},
+                },
+                "required": ["documentId", "workspaceId", "name"],
+            },
+        ),
+        Tool(
+            name="get_variables",
+            description="Get all variables from a Variable Studio (variables are shared across the document and referenced as #name)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "documentId": {"type": "string", "description": "Document ID"},
+                    "workspaceId": {"type": "string", "description": "Workspace ID"},
+                    "elementId": {
+                        "type": "string",
+                        "description": "Variable Studio element ID (create one with create_variable_studio)",
+                    },
                 },
                 "required": ["documentId", "workspaceId", "elementId"],
             },
         ),
         Tool(
             name="set_variable",
-            description="Set or update a variable in a Part Studio variable table",
+            description="Set or update a variable in a Variable Studio, preserving the other variables. The type (LENGTH/ANGLE/ANY) is inferred from the expression's units",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "documentId": {"type": "string", "description": "Document ID"},
                     "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
+                    "elementId": {
+                        "type": "string",
+                        "description": "Variable Studio element ID (create one with create_variable_studio)",
+                    },
                     "name": {"type": "string", "description": "Variable name"},
                     "expression": {
                         "type": "string",
@@ -1757,6 +1776,32 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
                 )
             ]
 
+    elif name == "create_variable_studio":
+        try:
+            result = await variable_manager.create_variable_studio(
+                arguments["documentId"], arguments["workspaceId"], arguments["name"]
+            )
+            element_id = result.get("id", "unknown")
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Created Variable Studio '{arguments['name']}'. Element ID: {element_id}",
+                )
+            ]
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"API error creating variable studio: {e.response.status_code} - {e.response.text[:500]}"
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error creating variable studio: API returned {e.response.status_code}.",
+                )
+            ]
+        except Exception as e:
+            logger.exception("Unexpected error creating variable studio")
+            return [TextContent(type="text", text=f"Error creating variable studio: {str(e)}")]
+
     elif name == "get_variables":
         try:
             variables = await variable_manager.get_variables(
@@ -1775,7 +1820,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
                 TextContent(
                     type="text",
                     text=(
-                        f"Variables in Part Studio:\n{var_list}"
+                        f"Variables in Variable Studio:\n{var_list}"
                         if var_list
                         else "No variables found"
                     ),

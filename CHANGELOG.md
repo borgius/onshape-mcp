@@ -33,6 +33,11 @@ cad.onshape.com on 2026-09-10.
   worked on a free account.
 - Shaded-view screenshots decode the flat `images` list the API actually returns (the
   OpenAPI schema says list-of-lists) and scale the model to fit the image (`pixelSize=0`). (#30)
+- `get_variables` and `set_variable` work against Variable Studios: the API returns
+  variable-table groups (each with a `variables` array) rather than a flat list, and
+  `setVariables` requires a `type` per entry and replaces the whole table. `set_variable` now
+  merges into the existing variables and infers `LENGTH`/`ANGLE`/`ANY` from the expression's
+  units. (resolves the defect behind #22 by @candera)
 
 ### Added
 
@@ -45,6 +50,10 @@ cad.onshape.com on 2026-09-10.
   boolean and the pattern fails with `PATTERN_SWITCH_TO_PER_INSTANCE`.
 - Regression test asserting no builder emits `libraryRelationType: "NONE"`. (#29, from #19
   by @candera)
+- `create_variable_studio`: create a Variable Studio, whose variables are shared across the
+  document and referenced as `#name`.
+- `scripts/run-with-creds.sh`: launch the server with credentials decrypted from a gpg file,
+  for editor integrations where environment variables are awkward. (from #22 by @candera)
 
 ### Changed
 
@@ -60,10 +69,8 @@ cad.onshape.com on 2026-09-10.
 
 ### Known gaps
 
-- The Variables API parser still expects a flat list; Onshape returns variable-table groups,
-  and `setVariables` needs a `type` per entry. The fix is on the unmerged batch branch.
-- The batch FeatureScript builders (`feature/batch-featurescript`) are not part of this
-  release.
+- The batch FeatureScript builders and the constrained-polygon sketch tool on
+  `feature/batch-featurescript` are not part of this release.
 
 ## [0.3.0] - 2026-03-02
 
