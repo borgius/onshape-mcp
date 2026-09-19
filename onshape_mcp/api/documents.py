@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from .client import OnshapeClient
 
 
@@ -19,8 +19,7 @@ class DocumentInfo(BaseModel):
     description: Optional[str] = None
     thumbnail: Optional[str] = None
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class WorkspaceInfo(BaseModel):
@@ -32,8 +31,7 @@ class WorkspaceInfo(BaseModel):
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
     modified_at: Optional[datetime] = Field(default=None, alias="modifiedAt")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ElementInfo(BaseModel):
@@ -45,8 +43,7 @@ class ElementInfo(BaseModel):
     data_type: Optional[str] = Field(default=None, alias="dataType")
     thumbnail: Optional[str] = None
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class DocumentManager:
@@ -311,6 +308,61 @@ class DocumentManager:
             public=response.get("public", False),
             description=response.get("description"),
             thumbnail=thumbnail_url,
+        )
+
+    async def copy_workspace_to_document(
+        self,
+        document_id: str,
+        workspace_id: str,
+        new_name: str,
+        is_public: bool = True,
+        repoint_app_element_version_refs: bool = True,
+    ) -> Dict[str, Any]:
+        """Copy a workspace into a new document.
+
+        Onshape has no native "move" for workspaces; this is the lossless
+        operation that turns a branch into a standalone project: it creates a
+        new document containing a copy of the workspace, independent of the
+        source document. Combine with :meth:`delete_workspace` for a true move.
+
+        Args:
+            document_id: Source document ID
+            workspace_id: Source workspace ID
+            new_name: Name for the new document
+            is_public: Whether the new document should be public. Defaults to
+                True because free Onshape accounts can only create public
+                documents (a private request fails with HTTP 409).
+            repoint_app_element_version_refs: Re-point application-element
+                version references to the initial version in the new document.
+
+        Returns:
+            Raw BTCopyDocumentInfo response (``newDocumentId``,
+            ``newDocumentName``, ``newWorkspaceId``, ...).
+        """
+        data: Dict[str, Any] = {
+            "newName": new_name,
+            "isPublic": is_public,
+            "repointAppElementVersionRefs": repoint_app_element_version_refs,
+        }
+        return await self.client.post(
+            f"/api/documents/{document_id}/workspaces/{workspace_id}/copy", data=data
+        )
+
+    async def delete_workspace(self, document_id: str, workspace_id: str) -> Dict[str, Any]:
+        """Delete a workspace (branch) from a document.
+
+        The main workspace cannot be deleted; Onshape returns an error if the
+        target workspace is the document's main workspace.
+
+        Args:
+            document_id: Document ID
+            workspace_id: Workspace ID to delete
+
+        Returns:
+            Raw response (empty dict on success).
+        """
+        return await self.client.delete(
+            f"/api/v6/documents/d/{document_id}/workspaces/{workspace_id}"
         )
 
     async def get_document_summary(self, document_id: str) -> Dict[str, Any]:

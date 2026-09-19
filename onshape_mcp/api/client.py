@@ -94,6 +94,20 @@ class OnshapeClient:
             return result[:max_length] + "... (truncated)"
         return result
 
+    def _log_error_response(self, method: str, url: str, response: httpx.Response) -> None:
+        """Log an upstream error response with status, request id, and sanitized body.
+
+        The request id is Onshape's ``x-request-id`` correlation header; it is what
+        ties a client-side failure to Onshape's own logs.
+        """
+        req_id = response.headers.get("x-request-id", "")
+        id_suffix = f" request_id={req_id}" if req_id else ""
+        try:
+            body = self._sanitize_for_logging(response.json(), max_length=500)
+        except Exception:
+            body = self._sanitize_for_logging(response.text, max_length=500)
+        logger.error(f"{method} {url} failed: HTTP {response.status_code}{id_suffix} body={body}")
+
     async def get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Make a GET request to Onshape API.
 
@@ -113,7 +127,11 @@ class OnshapeClient:
         self._ensure_client()
         logger.debug(f"GET {url} with params: {self._sanitize_for_logging(params)}")
         response = await self._client.get(url, params=params, headers=headers)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            self._log_error_response("GET", url, e.response)
+            raise
         result = response.json()
         logger.debug(f"GET {url} response: {self._sanitize_for_logging(result, max_length=500)}")
         return result
@@ -147,18 +165,11 @@ class OnshapeClient:
         response = await self._client.post(url, json=data, params=params, headers=headers)
 
         # Log error details if request failed
-        if response.status_code >= 400:
-            try:
-                error_body = response.json()
-                logger.error(
-                    f"POST {url} failed with status {response.status_code}: {self._sanitize_for_logging(error_body)}"
-                )
-            except Exception:
-                logger.error(
-                    f"POST {url} failed with status {response.status_code}: {response.text[:500]}"
-                )
-
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            self._log_error_response("POST", url, e.response)
+            raise
         if not response.content:
             logger.debug(f"POST {url} returned empty body (status {response.status_code})")
             return {}
@@ -184,7 +195,11 @@ class OnshapeClient:
 
         self._ensure_client()
         response = await self._client.delete(url, params=params, headers=headers)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            self._log_error_response("DELETE", url, e.response)
+            raise
         if not response.content:
             return {}
         return response.json()

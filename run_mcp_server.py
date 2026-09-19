@@ -25,7 +25,7 @@ from onshape_mcp.server import main
 if __name__ == "__main__":
     print("🚀 Starting Onshape MCP Server in development mode...")
     print(f"📂 Working directory: {project_root}")
-    print(f"🔑 Using API credentials from environment")
+    print("🔑 Using API credentials from environment")
     print("🐛 Debug mode: Ready for VSCode debugger")
     print("=" * 60)
 

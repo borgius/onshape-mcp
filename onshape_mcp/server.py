@@ -3,7 +3,9 @@
 import os
 import sys
 import asyncio
+import hmac
 from typing import Any
+from urllib.parse import parse_qs
 import httpx
 from dotenv import load_dotenv
 from mcp.server import Server
@@ -44,6 +46,32 @@ logger.add(
     level="DEBUG",
     format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>",
 )
+
+# Bridge Python stdlib logging into loguru. The MCP SDK (including its
+# Streamable HTTP transport, which emits the opaque -32603 "Internal error"
+# responses) logs through stdlib logging, so without this bridge its exception
+# stack traces never reach the server's stderr output.
+import logging
+
+
+class _LoguruInterceptHandler(logging.Handler):
+    """Forward stdlib logging records to loguru with full exception info."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+        frame, depth = logging.currentframe(), 2
+        while frame and frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
+
+logging.basicConfig(handlers=[_LoguruInterceptHandler()], level=logging.INFO, force=True)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 # Initialize server
@@ -440,6 +468,52 @@ async def list_tools() -> list[Tool]:
                     },
                 },
                 "required": ["name"],
+            },
+        ),
+        Tool(
+            name="copy_workspace_to_document",
+            description=(
+                "Copy a workspace (branch) into a new standalone document. This is "
+                "Onshape's lossless 'move branch to its own project' operation: it "
+                "creates a new document containing a copy of the workspace, independent "
+                "of the source. Combine with delete_workspace on the source for a true move."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "documentId": {"type": "string", "description": "Source document ID"},
+                    "workspaceId": {"type": "string", "description": "Source workspace ID"},
+                    "newName": {
+                        "type": "string",
+                        "description": "Name for the new document",
+                    },
+                    "isPublic": {
+                        "type": "boolean",
+                        "description": (
+                            "Whether the new document should be public. Defaults to true: "
+                            "free Onshape accounts can only create public documents "
+                            "and get HTTP 409 otherwise"
+                        ),
+                        "default": True,
+                    },
+                },
+                "required": ["documentId", "workspaceId", "newName"],
+            },
+        ),
+        Tool(
+            name="delete_workspace",
+            description=(
+                "Delete a workspace (branch) from a document. The main workspace cannot "
+                "be deleted. Use together with copy_workspace_to_document to move a branch "
+                "into its own project."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "documentId": {"type": "string", "description": "Document ID"},
+                    "workspaceId": {"type": "string", "description": "Workspace ID to delete"},
+                },
+                "required": ["documentId", "workspaceId"],
             },
         ),
         Tool(
@@ -1274,10 +1348,25 @@ async def list_tools() -> list[Tool]:
                         "description": "iso/isometric, a named view (top/bottom/front/back/left/right), or a raw 12-number view matrix",
                         "default": "iso",
                     },
-                    "outputWidth": {"type": "integer", "description": "Image width in pixels", "default": 800},
-                    "outputHeight": {"type": "integer", "description": "Image height in pixels", "default": 600},
-                    "showAllParts": {"type": "boolean", "description": "Show all parts regardless of visibility settings", "default": True},
-                    "outputPath": {"type": "string", "description": "Optional local file path to also save the PNG to"},
+                    "outputWidth": {
+                        "type": "integer",
+                        "description": "Image width in pixels",
+                        "default": 800,
+                    },
+                    "outputHeight": {
+                        "type": "integer",
+                        "description": "Image height in pixels",
+                        "default": 600,
+                    },
+                    "showAllParts": {
+                        "type": "boolean",
+                        "description": "Show all parts regardless of visibility settings",
+                        "default": True,
+                    },
+                    "outputPath": {
+                        "type": "string",
+                        "description": "Optional local file path to also save the PNG to",
+                    },
                 },
                 "required": ["documentId", "workspaceId", "elementId"],
             },
@@ -1296,10 +1385,25 @@ async def list_tools() -> list[Tool]:
                         "description": "iso/isometric, a named view (top/bottom/front/back/left/right), or a raw 12-number view matrix",
                         "default": "iso",
                     },
-                    "outputWidth": {"type": "integer", "description": "Image width in pixels", "default": 800},
-                    "outputHeight": {"type": "integer", "description": "Image height in pixels", "default": 600},
-                    "showAllParts": {"type": "boolean", "description": "Show all parts regardless of visibility settings", "default": True},
-                    "outputPath": {"type": "string", "description": "Optional local file path to also save the PNG to"},
+                    "outputWidth": {
+                        "type": "integer",
+                        "description": "Image width in pixels",
+                        "default": 800,
+                    },
+                    "outputHeight": {
+                        "type": "integer",
+                        "description": "Image height in pixels",
+                        "default": 600,
+                    },
+                    "showAllParts": {
+                        "type": "boolean",
+                        "description": "Show all parts regardless of visibility settings",
+                        "default": True,
+                    },
+                    "outputPath": {
+                        "type": "string",
+                        "description": "Optional local file path to also save the PNG to",
+                    },
                 },
                 "required": ["documentId", "workspaceId", "elementId"],
             },
@@ -1590,9 +1694,30 @@ async def _create_mate(
     return result.get("feature", {}).get("featureId", "unknown")
 
 
+def _sanitize_args(arguments: Any, max_length: int = 500) -> str:
+    """Compact, secret-free representation of tool arguments for logging."""
+    text = str(arguments)
+    return text if len(text) <= max_length else text[:max_length] + "... (truncated)"
+
+
 @app.call_tool()
 async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageContent]:
-    """Handle tool calls."""
+    """Handle tool calls with entry + exception logging.
+
+    Exceptions are logged with a full stack trace and re-raised so the MCP SDK
+    turns them into an ``isError=True`` tool result (never an opaque transport
+    error). The Onshape client already logs upstream status/request-id/body.
+    """
+    logger.info(f"MCP call_tool '{name}' args={_sanitize_args(arguments)}")
+    try:
+        return await _call_tool_impl(name, arguments)
+    except Exception:
+        logger.exception(f"MCP call_tool '{name}' raised an exception")
+        raise
+
+
+async def _call_tool_impl(name: str, arguments: Any) -> list[TextContent | ImageContent]:
+    """Dispatch a tool call to its handler."""
 
     if name == "create_sketch_rectangle":
         try:
@@ -2331,6 +2456,74 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
                 )
             ]
 
+    elif name == "copy_workspace_to_document":
+        try:
+            result = await document_manager.copy_workspace_to_document(
+                document_id=arguments["documentId"],
+                workspace_id=arguments["workspaceId"],
+                new_name=arguments["newName"],
+                is_public=arguments.get("isPublic", True),
+            )
+
+            new_doc_id = result.get("newDocumentId", "unknown")
+            new_doc_name = result.get("newDocumentName", arguments["newName"])
+            new_ws_id = result.get("newWorkspaceId", "unknown")
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Copied workspace '{arguments['workspaceId']}' to new document "
+                    f"'{new_doc_name}'\n"
+                    f"New document ID: {new_doc_id}\n"
+                    f"New workspace ID: {new_ws_id}",
+                )
+            ]
+        except httpx.HTTPStatusError as e:
+            logger.error(f"API error copying workspace: {e.response.status_code}")
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error copying workspace: API returned {e.response.status_code}. Check your API credentials and permissions.",
+                )
+            ]
+        except Exception as e:
+            logger.exception("Unexpected error copying workspace")
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error copying workspace: {str(e)}",
+                )
+            ]
+
+    elif name == "delete_workspace":
+        try:
+            await document_manager.delete_workspace(
+                document_id=arguments["documentId"],
+                workspace_id=arguments["workspaceId"],
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Deleted workspace '{arguments['workspaceId']}' from document "
+                    f"'{arguments['documentId']}'.",
+                )
+            ]
+        except httpx.HTTPStatusError as e:
+            logger.error(f"API error deleting workspace: {e.response.status_code}")
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error deleting workspace: API returned {e.response.status_code}. The main workspace cannot be deleted.",
+                )
+            ]
+        except Exception as e:
+            logger.exception("Unexpected error deleting workspace")
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error deleting workspace: {str(e)}",
+                )
+            ]
+
     elif name == "create_part_studio":
         try:
             result = await partstudio_manager.create_part_studio(
@@ -2401,8 +2594,31 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
                 part_id=arguments.get("partId"),
                 is_assembly=arguments.get("isAssembly", False),
             )
-            instance_id = result.get("id", "unknown")
-            instance_name = result.get("name", "unnamed")
+            instance_id = result.get("id")
+            instance_name = result.get("name")
+            if not instance_id:
+                definition = await assembly_manager.get_assembly_definition(
+                    arguments["documentId"],
+                    arguments["workspaceId"],
+                    arguments["elementId"],
+                )
+                expected_type = "Assembly" if arguments.get("isAssembly", False) else "Part"
+                candidates = [
+                    instance
+                    for instance in definition.get("rootAssembly", {}).get("instances", [])
+                    if instance.get("type") == expected_type
+                    and instance.get("elementId") == arguments["partStudioElementId"]
+                    and (
+                        expected_type == "Assembly"
+                        or arguments.get("partId") is None
+                        or instance.get("partId") == arguments.get("partId")
+                    )
+                ]
+                if candidates:
+                    instance_id = candidates[-1].get("id")
+                    instance_name = candidates[-1].get("name")
+            instance_id = instance_id or "unknown"
+            instance_name = instance_name or "unnamed"
             return [
                 TextContent(
                     type="text",
@@ -3048,12 +3264,19 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
                 show_all_parts=arguments.get("showAllParts", True),
                 output_path=arguments.get("outputPath"),
             )
-            content: list[Any] = [ImageContent(type="image", data=result["data"], mimeType=result["mimeType"])]
+            content: list[Any] = [
+                ImageContent(type="image", data=result["data"], mimeType=result["mimeType"])
+            ]
             if result.get("path"):
                 content.append(TextContent(type="text", text=f"Saved to {result['path']}"))
             return content
         except httpx.HTTPStatusError as e:
-            return [TextContent(type="text", text=f"Error capturing screenshot: API returned {e.response.status_code}.")]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error capturing screenshot: API returned {e.response.status_code}.",
+                )
+            ]
         except Exception as e:
             return [TextContent(type="text", text=f"Error capturing screenshot: {str(e)}")]
 
@@ -3069,12 +3292,19 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
                 show_all_parts=arguments.get("showAllParts", True),
                 output_path=arguments.get("outputPath"),
             )
-            content: list[Any] = [ImageContent(type="image", data=result["data"], mimeType=result["mimeType"])]
+            content: list[Any] = [
+                ImageContent(type="image", data=result["data"], mimeType=result["mimeType"])
+            ]
             if result.get("path"):
                 content.append(TextContent(type="text", text=f"Saved to {result['path']}"))
             return content
         except httpx.HTTPStatusError as e:
-            return [TextContent(type="text", text=f"Error capturing screenshot: API returned {e.response.status_code}.")]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error capturing screenshot: API returned {e.response.status_code}.",
+                )
+            ]
         except Exception as e:
             return [TextContent(type="text", text=f"Error capturing screenshot: {str(e)}")]
 
@@ -3402,6 +3632,43 @@ async def main_stdio():
         await app.run(read_stream, write_stream, app.create_initialization_options())
 
 
+# Bearer token required for the SSE endpoint. Set via MCP_AUTH_TOKEN (loaded from
+# .env). Empty means the endpoint is open.
+_MCP_AUTH_TOKEN = os.getenv("MCP_AUTH_TOKEN", "").strip()
+
+
+def _request_is_authorized(scope) -> bool:
+    """Return True if the request carries the configured bearer token.
+
+    The token may be supplied as a ``?token=`` query parameter (what ChatGPT's
+    URL-only connector supports) or an ``Authorization: Bearer`` header. When
+    ``MCP_AUTH_TOKEN`` is unset, requests are allowed (open endpoint).
+    """
+    if not _MCP_AUTH_TOKEN:
+        return True
+    qs = parse_qs(scope.get("query_string", b"").decode("utf-8"))
+    token = (qs.get("token") or [""])[0]
+    headers = {
+        k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])
+    }
+    auth = headers.get("authorization", "")
+    bearer = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+    return hmac.compare_digest(token, _MCP_AUTH_TOKEN) or hmac.compare_digest(
+        bearer, _MCP_AUTH_TOKEN
+    )
+
+
+async def _reject(scope, receive, send, status: int, body: bytes) -> None:
+    await send(
+        {
+            "type": "http.response.start",
+            "status": status,
+            "headers": [[b"content-type", b"text/plain"]],
+        }
+    )
+    await send({"type": "http.response.body", "body": body})
+
+
 def create_sse_app():
     """Create SSE ASGI application."""
     from mcp.server.sse import SseServerTransport
@@ -3414,6 +3681,9 @@ def create_sse_app():
             path = scope["path"]
 
             if path == "/sse":
+                if not _request_is_authorized(scope):
+                    await _reject(scope, receive, send, 401, b"Unauthorized")
+                    return
                 # Handle SSE endpoint
                 async with sse.connect_sse(scope, receive, send) as streams:
                     await app.run(streams[0], streams[1], app.create_initialization_options())
@@ -3443,22 +3713,62 @@ def create_sse_app():
 sse_app = create_sse_app()
 
 
+def create_streamable_http_app():
+    """Create a Starlette app serving MCP over Streamable HTTP.
+
+    This is the transport ChatGPT's connector speaks: a single endpoint
+    accepting POST JSON-RPC (and GET for server-initiated SSE streams), instead
+    of the legacy split ``/sse`` + ``/messages`` transport.
+    """
+    import contextlib
+
+    from starlette.applications import Starlette
+    from starlette.routing import Mount
+    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+    manager = StreamableHTTPSessionManager(app)
+
+    async def mcp_endpoint(scope, receive, send):
+        if not _request_is_authorized(scope):
+            await _reject(scope, receive, send, 401, b"Unauthorized")
+            return
+        await manager.handle_request(scope, receive, send)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_app):
+        async with manager.run():
+            yield
+
+    return Starlette(
+        routes=[Mount("/mcp", app=mcp_endpoint), Mount("/", app=mcp_endpoint)],
+        lifespan=lifespan,
+    )
+
+
+# Module-level Streamable HTTP app for uvicorn
+http_app = create_streamable_http_app()
+
+
 def main():
     """Main entry point - run stdio by default."""
-    # Check if we should run in SSE mode
-    if "--sse" in sys.argv or os.getenv("MCP_TRANSPORT") == "sse":
-        import uvicorn
+    import uvicorn
 
-        # Get port from args or env
-        port = 3000
-        for i, arg in enumerate(sys.argv):
-            if arg == "--port" and i + 1 < len(sys.argv):
-                port = int(sys.argv[i + 1])
-        port = int(os.getenv("MCP_PORT", port))
+    # Get port from args or env
+    port = 3000
+    for i, arg in enumerate(sys.argv):
+        if arg == "--port" and i + 1 < len(sys.argv):
+            port = int(sys.argv[i + 1])
+    port = int(os.getenv("MCP_PORT", port))
 
-        # Check if reload is requested
-        reload = "--reload" in sys.argv or os.getenv("MCP_RELOAD") == "true"
+    # Check if reload is requested
+    reload = "--reload" in sys.argv or os.getenv("MCP_RELOAD") == "true"
 
+    # Streamable HTTP transport (what ChatGPT's connector speaks)
+    if "--http" in sys.argv or os.getenv("MCP_TRANSPORT") == "http":
+        print(f"Starting Onshape MCP server over Streamable HTTP on port {port}", file=sys.stderr)
+        uvicorn.run(http_app, host="127.0.0.1", port=port)
+    # Legacy SSE transport
+    elif "--sse" in sys.argv or os.getenv("MCP_TRANSPORT") == "sse":
         print(f"Starting Onshape MCP server in SSE mode on port {port}", file=sys.stderr)
         if reload:
             print("Auto-reload enabled - server will restart on code changes", file=sys.stderr)
