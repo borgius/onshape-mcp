@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "pathPolicy": "Managers resolve configured API families through OnshapeClient.api_path; no manager contains a literal /api/vN path.",
+  "operations": {
+    "documents": ["list_documents", "get_document", "get_workspaces", "get_elements", "create_document", "create_workspace", "create_version", "copy_workspace_to_document", "delete_workspace"],
+    "partstudios": ["get_features", "get_parts", "get_body_details", "get_plane_id", "add_feature", "update_feature", "delete_feature", "create_part_studio"],
+    "assemblies": ["get_assembly_definition", "create_assembly", "add_instance", "delete_instance", "transform_occurrences", "add_feature", "update_feature", "delete_feature", "get_features"],
+    "variables": ["create_variable_studio", "get_variables", "set_variable", "get_configuration_definition"],
+    "translations": ["export_part_studio", "export_assembly"],
+    "translation_status": ["get_translation_status"],
+    "visuals": ["capture_part_studio", "capture_assembly"],
+    "featurescript": ["evaluate", "get_bounding_box"],
+    "featurestudios": ["create_feature_studio"]
+  },
+  "multipleCodePaths": [
+    "FeatureScript evaluation remains available internally for test_featurescript expression mode; source compilation uses reviewed operationId dispatch.",
+    "Legacy operation-specific call_tool handlers remain internal during compatibility migration and are not listed by the default MCP profile."
+  ]
+}

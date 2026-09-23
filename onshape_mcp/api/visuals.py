@@ -128,7 +128,10 @@ class VisualsManager:
         Returns:
             Dict with base64 `data`, `mimeType`, and (if requested) `path`
         """
-        path = f"/api/v10/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/shadedviews"
+        path = self.client.api_path(
+            f"/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/shadedviews",
+            "visuals",
+        )
         image_bytes = await self._capture(
             path, view, output_width, output_height, show_all_parts, use_anti_aliasing, pixel_size
         )
@@ -166,7 +169,10 @@ class VisualsManager:
         Returns:
             Dict with base64 `data`, `mimeType`, and (if requested) `path`
         """
-        path = f"/api/v10/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/shadedviews"
+        path = self.client.api_path(
+            f"/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/shadedviews",
+            "visuals",
+        )
         image_bytes = await self._capture(
             path, view, output_width, output_height, show_all_parts, use_anti_aliasing, pixel_size
         )

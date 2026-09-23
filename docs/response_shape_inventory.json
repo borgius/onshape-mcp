@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "sources": ["tests/api", "tests/test_server.py", "onshape_mcp/services"],
+  "contracts": {
+    "structuredToolResult": ["ok", "summary", "target", "data", "state", "warnings", "diagnostics", "nextActions", "httpStatus", "requestId", "retryable"],
+    "pagination": {"documents": ["limit", "offset"], "operationDiscovery": ["limit"]},
+    "translation": {"pending": ["requestState", "translationId"], "terminal": ["requestState", "downloadReference"], "failure": ["diagnostics", "retryable"]},
+    "featureScript": {"compile": ["diagnostics", "state.compiled"], "geometry": ["boundingBox", "bodyDetails"]},
+    "mutations": {"emptySuccess": "{}", "identifiers": ["id", "documentId", "workspaceId", "versionId", "microversionId", "elementId", "featureId", "translationId"]}
+  },
+  "authentication": {"apiKey": "ONSHAPE_ACCESS_KEY + ONSHAPE_SECRET_KEY", "oauth": "authenticated OpenAPI scope set via ONSHAPE_SCOPES"}
+}

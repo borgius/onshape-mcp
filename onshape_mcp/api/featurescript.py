@@ -31,11 +31,24 @@ class FeatureScriptManager:
         Returns:
             Evaluation result
         """
-        path = f"/api/v8/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/featurescript"
+        path = self.client.api_path(
+            f"/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/featurescript",
+            "featurescript",
+        )
         data = {
             "script": script,
         }
         return await self.client.post(path, params={"rollbackBarIndex": -1}, data=data)
+
+    async def create_feature_studio(
+        self, document_id: str, workspace_id: str, name: str
+    ) -> Dict[str, Any]:
+        """Create a Feature Studio tab in a workspace."""
+        path = self.client.api_path(
+            f"/featurestudios/d/{document_id}/w/{workspace_id}",
+            "featurestudios",
+        )
+        return await self.client.post(path, data={"name": name})
 
     async def get_bounding_box(
         self,

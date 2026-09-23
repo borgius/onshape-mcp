@@ -32,7 +32,10 @@ class ExportManager:
         Returns:
             Translation/export result with download URL or data
         """
-        path = f"/api/v11/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/translations"
+        path = self.client.api_path(
+            f"/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/translations",
+            "translations",
+        )
         data: Dict[str, Any] = {
             "formatName": format_name.upper(),
             "storeInDocument": False,
@@ -60,7 +63,10 @@ class ExportManager:
         Returns:
             Translation/export result
         """
-        path = f"/api/v11/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/translations"
+        path = self.client.api_path(
+            f"/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/translations",
+            "translations",
+        )
         data: Dict[str, Any] = {
             "formatName": format_name.upper(),
             "storeInDocument": False,
@@ -79,5 +85,5 @@ class ExportManager:
         Returns:
             Translation status with state and result URL
         """
-        path = f"/api/v6/translations/{translation_id}"
+        path = self.client.api_path(f"/translations/{translation_id}", "translation_status")
         return await self.client.get(path)

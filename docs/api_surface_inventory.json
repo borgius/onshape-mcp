@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "generatedFrom": "onshape_mcp/api",
+  "hardcodedVersionedPaths": [],
+  "apiVersionSelection": {
+    "default": "v9",
+    "documents": "v6",
+    "documents_write": "v10",
+    "assemblies": "v9",
+    "partstudios": "v9",
+    "parts": "v6",
+    "variables": "v6",
+    "translations": "v11",
+    "translation_status": "v6",
+    "featurestudios": "v9",
+    "featurescript": "v8"
+  },
+  "authentication": {
+    "credentials": ["ONSHAPE_ACCESS_KEY", "ONSHAPE_SECRET_KEY"],
+    "transport": "HTTP Basic authentication",
+    "optionalScopes": "ONSHAPE_SCOPES"
+  },
+  "behavior": {
+    "emptySuccessBody": "returns an empty object",
+    "pagination": "document listing exposes limit and offset",
+    "translationPolling": "bounded get_translation polling",
+    "featureScriptDiagnostics": "structured Diagnostic entries when upstream returns diagnostics"
+  }
+}

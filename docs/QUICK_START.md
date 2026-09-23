@@ -33,7 +33,8 @@ Add this to your `~/.claude/mcp.json` file:
       "args": ["-m", "onshape_mcp.server"],
       "env": {
         "ONSHAPE_ACCESS_KEY": "your_access_key_here",
-        "ONSHAPE_SECRET_KEY": "your_secret_key_here"
+        "ONSHAPE_SECRET_KEY": "your_secret_key_here",
+        "ONSHAPE_MCP_PROFILE": "default"
       }
     }
   }
@@ -333,12 +334,14 @@ make clean
 - Run `pip install -e ".[dev]"` again
 - Check Python version: `python --version` (needs 3.10+)
 
-## 📊 Statistics
+## Current MCP Surface
 
-- **10 MCP Tools** - Full CAD and discovery capabilities
-- **93 Unit Tests** - Comprehensive test coverage
-- **~2 second** test execution - Fast feedback
-- **5 API modules** - Well-organized codebase
+- **20 default MCP tools** for reviewed domain workflows.
+- **22 advanced tools** when `ONSHAPE_MCP_PROFILE=advanced`, adding reviewed OpenAPI query/mutation gateway tools.
+- **Operation schemas** are available on demand through `onshape://schemas/{operationId}` resources.
+- **Destructive mutations** require an allowlisted resource kind and a short-lived plan token.
+- **API versions** are selected centrally; override families with `ONSHAPE_API_VERSIONS_JSON` when required.
+- **Tests:** run `uv run pytest`.
 
 ---
 

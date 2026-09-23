@@ -176,5 +176,8 @@ class VariableManager:
         Returns:
             Configuration definition
         """
-        path = f"/api/v6/elements/d/{document_id}/w/{workspace_id}/e/{element_id}/configuration"
+        path = self.client.api_path(
+            f"/elements/d/{document_id}/w/{workspace_id}/e/{element_id}/configuration",
+            "variables",
+        )
         return await self.client.get(path)

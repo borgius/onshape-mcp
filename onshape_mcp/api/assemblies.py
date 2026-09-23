@@ -34,7 +34,9 @@ class AssemblyManager:
         Returns:
             Assembly definition data
         """
-        path = f"/api/v9/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}"
+        path = self.client.api_path(
+            f"/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}", "assemblies"
+        )
         return await self.client.get(path, params=params)
 
     async def create_assembly(
@@ -50,7 +52,7 @@ class AssemblyManager:
         Returns:
             API response with new Assembly info
         """
-        path = f"/api/v9/assemblies/d/{document_id}/w/{workspace_id}"
+        path = self.client.api_path(f"/assemblies/d/{document_id}/w/{workspace_id}", "assemblies")
         data = {"name": name}
         return await self.client.post(path, data=data)
 
@@ -76,7 +78,10 @@ class AssemblyManager:
         Returns:
             API response
         """
-        path = f"/api/v9/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/instances"
+        path = self.client.api_path(
+            f"/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/instances",
+            "assemblies",
+        )
         if is_assembly:
             data: Dict[str, Any] = {
                 "documentId": document_id,
@@ -107,9 +112,9 @@ class AssemblyManager:
         Returns:
             API response
         """
-        path = (
-            f"/api/v9/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}"
-            f"/instance/nodeid/{node_id}"
+        path = self.client.api_path(
+            f"/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/instance/nodeid/{node_id}",
+            "assemblies",
         )
         return await self.client.delete(path)
 
@@ -135,9 +140,9 @@ class AssemblyManager:
         Returns:
             API response
         """
-        path = (
-            f"/api/v9/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}"
-            f"/occurrencetransforms"
+        path = self.client.api_path(
+            f"/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/occurrencetransforms",
+            "assemblies",
         )
         data = {
             "isRelative": is_relative,
@@ -160,7 +165,26 @@ class AssemblyManager:
         Returns:
             API response
         """
-        path = f"/api/v9/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/features"
+        path = self.client.api_path(
+            f"/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/features",
+            "assemblies",
+        )
+        return await self.client.post(path, data=feature_data)
+
+    async def update_feature(
+        self,
+        document_id: str,
+        workspace_id: str,
+        element_id: str,
+        feature_id: str,
+        feature_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Update an assembly feature definition."""
+        encoded_fid = quote(feature_id, safe="")
+        path = self.client.api_path(
+            f"/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/features/featureid/{encoded_fid}",
+            "assemblies",
+        )
         return await self.client.post(path, data=feature_data)
 
     async def delete_feature(
@@ -178,9 +202,9 @@ class AssemblyManager:
             API response
         """
         encoded_fid = quote(feature_id, safe="")
-        path = (
-            f"/api/v9/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}"
-            f"/features/featureid/{encoded_fid}"
+        path = self.client.api_path(
+            f"/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/features/featureid/{encoded_fid}",
+            "assemblies",
         )
         return await self.client.delete(path)
 
@@ -197,5 +221,8 @@ class AssemblyManager:
         Returns:
             Features data including feature list with states
         """
-        path = f"/api/v9/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/features"
+        path = self.client.api_path(
+            f"/assemblies/d/{document_id}/w/{workspace_id}/e/{element_id}/features",
+            "assemblies",
+        )
         return await self.client.get(path)

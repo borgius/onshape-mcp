@@ -4,13 +4,14 @@ import os
 import sys
 import asyncio
 import hmac
+import json
 from typing import Any
 from urllib.parse import parse_qs
 import httpx
 from dotenv import load_dotenv
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent, ImageContent
+from mcp.types import Tool, TextContent, ImageContent, Resource, ResourceTemplate
 from loguru import logger
 
 # Load environment variables from .env file before local imports read them.
@@ -38,6 +39,27 @@ from .builders.axis_helper import build_axis_sketch
 from .builders.boolean import BooleanBuilder, BooleanType
 from .analysis.interference import check_assembly_interference, format_interference_result
 from .analysis.positioning import get_assembly_positions, set_absolute_position, align_to_face
+from .api.registry import OperationRegistry
+from .models.references import OnshapeTarget
+from .models.results import ToolResult
+from .services import (
+    AssemblyInspectionService,
+    AssemblyWriteService,
+    DestructiveOperationGate,
+    DiscoveryService,
+    FeatureScriptDocumentationIndex,
+    FeatureScriptDocument,
+    FeatureScriptWorkflowService,
+    GeometryInspectionService,
+    ObjectWriteService,
+    OpenAPIGateway,
+    PartFeatureWriteService,
+    PartStudioInspectionService,
+    SketchWriteService,
+    TranslationService,
+    VariableWriteService,
+)
+from .tools.consolidated import consolidated_tools
 
 # Configure loguru to output to stderr
 logger.remove()  # Remove default handler
@@ -89,6 +111,77 @@ assembly_manager = AssemblyManager(client)
 featurescript_manager = FeatureScriptManager(client)
 export_manager = ExportManager(client)
 visuals_manager = VisualsManager(client)
+operation_registry = OperationRegistry()
+_openapi_path = os.getenv("ONSHAPE_OPENAPI_PATH")
+if _openapi_path and os.path.isfile(_openapi_path):
+    operation_registry = OperationRegistry.from_json_file(_openapi_path)
+_authenticated_scopes = frozenset(
+    scope.strip() for scope in os.getenv("ONSHAPE_SCOPES", "").split(",") if scope.strip()
+)
+_mcp_profile = os.getenv("ONSHAPE_MCP_PROFILE", "default").lower()
+if _mcp_profile not in {"default", "advanced"}:
+    raise RuntimeError("ONSHAPE_MCP_PROFILE must be 'default' or 'advanced'")
+destructive_gate = DestructiveOperationGate()
+discovery_service = DiscoveryService(document_manager)
+partstudio_inspection_service = PartStudioInspectionService(partstudio_manager)
+assembly_inspection_service = AssemblyInspectionService(assembly_manager, partstudio_manager)
+geometry_inspection_service = GeometryInspectionService(partstudio_manager, visuals_manager)
+translation_service = TranslationService(export_manager)
+featurescript_docs = FeatureScriptDocumentationIndex(
+    [
+        FeatureScriptDocument(
+            title="FeatureScript introduction",
+            content=(
+                "FeatureScript is Onshape's language for building parametric features. "
+                "Native features such as Extrude and Fillet are implemented with FeatureScript."
+            ),
+            source="https://cad.onshape.com/FsDoc/intro.html",
+            version="v1",
+        ),
+        FeatureScriptDocument(
+            title="Feature Studios",
+            content=(
+                "A Feature Studio is an Onshape document tab containing FeatureScript. "
+                "Custom features authored there can be reused in Part Studios."
+            ),
+            source="https://cad.onshape.com/help/Content/featurestudios.htm",
+            version="v1",
+        ),
+        FeatureScriptDocument(
+            title="FeatureScript source validation cookbook",
+            content=(
+                "Validate source with a reviewed compile operation before regeneration. "
+                "Preserve compiler diagnostics with line and column information, then "
+                "inspect the resulting Part Studio bounding box and body details."
+            ),
+            source="onshape-mcp://featurescript/cookbook",
+            version="v1",
+        ),
+    ]
+)
+featurescript_workflow_service = FeatureScriptWorkflowService(
+    featurescript_manager,
+    partstudio_manager=partstudio_manager,
+    documentation=featurescript_docs,
+)
+object_write_service = ObjectWriteService(
+    document_manager,
+    partstudio_manager,
+    assembly_manager,
+    variable_manager,
+    feature_manager=featurescript_manager,
+)
+sketch_write_service = SketchWriteService(partstudio_manager)
+part_feature_write_service = PartFeatureWriteService(partstudio_manager)
+variable_write_service = VariableWriteService(variable_manager)
+assembly_write_service = AssemblyWriteService(assembly_manager)
+openapi_gateway = OpenAPIGateway(
+    client,
+    operation_registry,
+    destructive_gate=destructive_gate,
+    authenticated_scopes=_authenticated_scopes,
+)
+CONSOLIDATED_TOOL_NAMES = frozenset(tool.name for tool in consolidated_tools())
 
 
 async def _create_axis_edge(document_id: str, workspace_id: str, element_id: str, axis: str) -> str:
@@ -115,1424 +208,40 @@ async def _create_axis_edge(document_id: str, workspace_id: str, element_id: str
 
 @app.list_tools()
 async def list_tools() -> list[Tool]:
-    """List available MCP tools."""
+    """List the reviewed tools for the configured MCP profile."""
+    return consolidated_tools(_mcp_profile)
+
+
+@app.list_resources()
+async def list_resources() -> list[Resource]:
+    """List static MCP resources; operation schemas are exposed as templates."""
+    return []
+
+
+@app.list_resource_templates()
+async def list_resource_templates() -> list[ResourceTemplate]:
     return [
-        Tool(
-            name="create_sketch_rectangle",
-            description="Create a rectangular sketch in a Part Studio with optional variable references",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {"type": "string", "description": "Sketch name", "default": "Sketch"},
-                    "plane": {
-                        "type": "string",
-                        "enum": ["Front", "Top", "Right"],
-                        "description": "Sketch plane",
-                        "default": "Front",
-                    },
-                    "corner1": {
-                        "type": "array",
-                        "items": {"type": "number"},
-                        "minItems": 2,
-                        "maxItems": 2,
-                        "description": "First corner [x, y] in inches",
-                    },
-                    "corner2": {
-                        "type": "array",
-                        "items": {"type": "number"},
-                        "minItems": 2,
-                        "maxItems": 2,
-                        "description": "Second corner [x, y] in inches",
-                    },
-                    "variableWidth": {
-                        "type": "string",
-                        "description": "Optional variable name for width",
-                    },
-                    "variableHeight": {
-                        "type": "string",
-                        "description": "Optional variable name for height",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "corner1", "corner2"],
-            },
-        ),
-        Tool(
-            name="create_extrude",
-            description="Create an extrude feature from a sketch",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {"type": "string", "description": "Extrude name", "default": "Extrude"},
-                    "sketchFeatureId": {"type": "string", "description": "ID of sketch to extrude"},
-                    "depth": {"type": "number", "description": "Extrude depth in inches"},
-                    "variableDepth": {
-                        "type": "string",
-                        "description": "Optional variable name for depth",
-                    },
-                    "operationType": {
-                        "type": "string",
-                        "enum": ["NEW", "ADD", "REMOVE", "INTERSECT"],
-                        "description": "Extrude operation type",
-                        "default": "NEW",
-                    },
-                    "oppositeDirection": {
-                        "type": "boolean",
-                        "description": "Extrude away from the sketch plane's default normal direction instead of along it",
-                        "default": False,
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "sketchFeatureId", "depth"],
-            },
-        ),
-        Tool(
-            name="create_thicken",
-            description="Create a thicken feature from a sketch",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {"type": "string", "description": "Thicken name", "default": "Thicken"},
-                    "sketchFeatureId": {"type": "string", "description": "ID of sketch to thicken"},
-                    "thickness": {"type": "number", "description": "Thickness in inches"},
-                    "variableThickness": {
-                        "type": "string",
-                        "description": "Optional variable name for thickness",
-                    },
-                    "operationType": {
-                        "type": "string",
-                        "enum": ["NEW", "ADD", "REMOVE", "INTERSECT"],
-                        "description": "Thicken operation type",
-                        "default": "NEW",
-                    },
-                    "midplane": {
-                        "type": "boolean",
-                        "description": "Thicken symmetrically from sketch plane",
-                        "default": False,
-                    },
-                    "oppositeDirection": {
-                        "type": "boolean",
-                        "description": "Thicken in opposite direction",
-                        "default": False,
-                    },
-                },
-                "required": [
-                    "documentId",
-                    "workspaceId",
-                    "elementId",
-                    "sketchFeatureId",
-                    "thickness",
-                ],
-            },
-        ),
-        Tool(
-            name="create_variable_studio",
-            description="Create a new Variable Studio in a document. Variables defined there are shared across all Part Studios in the document and referenced in expressions as #variable_name.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "name": {"type": "string", "description": "Name for the new Variable Studio"},
-                },
-                "required": ["documentId", "workspaceId", "name"],
-            },
-        ),
-        Tool(
-            name="get_variables",
-            description="Get all variables from a Variable Studio (variables are shared across the document and referenced as #name)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {
-                        "type": "string",
-                        "description": "Variable Studio element ID (create one with create_variable_studio)",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        Tool(
-            name="set_variable",
-            description="Set or update a variable in a Variable Studio, preserving the other variables. The type (LENGTH/ANGLE/ANY) is inferred from the expression's units",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {
-                        "type": "string",
-                        "description": "Variable Studio element ID (create one with create_variable_studio)",
-                    },
-                    "name": {"type": "string", "description": "Variable name"},
-                    "expression": {
-                        "type": "string",
-                        "description": "Variable expression (e.g., '0.75 in')",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Optional variable description",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "name", "expression"],
-            },
-        ),
-        Tool(
-            name="get_features",
-            description="Get all features from a Part Studio",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        Tool(
-            name="delete_feature",
-            description="Delete a feature from a Part Studio or Assembly",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {
-                        "type": "string",
-                        "description": "Part Studio or Assembly element ID",
-                    },
-                    "featureId": {"type": "string", "description": "Feature ID to delete"},
-                    "elementType": {
-                        "type": "string",
-                        "enum": ["PARTSTUDIO", "ASSEMBLY"],
-                        "description": "Type of element containing the feature",
-                        "default": "PARTSTUDIO",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "featureId"],
-            },
-        ),
-        Tool(
-            name="list_documents",
-            description="List documents in your Onshape account with optional filtering and sorting",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "filterType": {
-                        "type": "string",
-                        "enum": ["all", "owned", "created", "shared"],
-                        "description": "Filter documents by type",
-                        "default": "all",
-                    },
-                    "sortBy": {
-                        "type": "string",
-                        "enum": ["name", "modifiedAt", "createdAt"],
-                        "description": "Sort field",
-                        "default": "modifiedAt",
-                    },
-                    "sortOrder": {
-                        "type": "string",
-                        "enum": ["asc", "desc"],
-                        "description": "Sort order",
-                        "default": "desc",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of documents to return",
-                        "default": 20,
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="search_documents",
-            description="Search for documents by name or description",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "Search query string"},
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of results",
-                        "default": 20,
-                    },
-                },
-                "required": ["query"],
-            },
-        ),
-        Tool(
-            name="get_document",
-            description="Get detailed information about a specific document",
-            inputSchema={
-                "type": "object",
-                "properties": {"documentId": {"type": "string", "description": "Document ID"}},
-                "required": ["documentId"],
-            },
-        ),
-        Tool(
-            name="get_document_summary",
-            description="Get a comprehensive summary of a document including all workspaces and elements",
-            inputSchema={
-                "type": "object",
-                "properties": {"documentId": {"type": "string", "description": "Document ID"}},
-                "required": ["documentId"],
-            },
-        ),
-        Tool(
-            name="find_part_studios",
-            description=(
-                "Find Part Studio elements in a specific workspace, optionally filtered by name"
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "namePattern": {
-                        "type": "string",
-                        "description": ("Optional name pattern to filter by (case-insensitive)"),
-                    },
-                },
-                "required": ["documentId", "workspaceId"],
-            },
-        ),
-        Tool(
-            name="get_parts",
-            description="Get all parts from a Part Studio element",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        Tool(
-            name="get_elements",
-            description=("Get all elements (Part Studios, Assemblies, etc.) in a workspace"),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementType": {
-                        "type": "string",
-                        "description": (
-                            "Optional filter by element type (e.g., 'PARTSTUDIO', 'ASSEMBLY')"
-                        ),
-                    },
-                },
-                "required": ["documentId", "workspaceId"],
-            },
-        ),
-        Tool(
-            name="get_assembly",
-            description="Get assembly structure including instances and occurrences",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        Tool(
-            name="create_document",
-            description="Create a new Onshape document",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string", "description": "Name for the new document"},
-                    "description": {
-                        "type": "string",
-                        "description": "Optional description for the document",
-                    },
-                    "isPublic": {
-                        "type": "boolean",
-                        "description": "Whether the document should be public. Defaults to true: free Onshape accounts can only create public documents and get HTTP 409 otherwise",
-                        "default": True,
-                    },
-                },
-                "required": ["name"],
-            },
-        ),
-        Tool(
-            name="copy_workspace_to_document",
-            description=(
-                "Copy a workspace (branch) into a new standalone document. This is "
-                "Onshape's lossless 'move branch to its own project' operation: it "
-                "creates a new document containing a copy of the workspace, independent "
-                "of the source. Combine with delete_workspace on the source for a true move."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Source document ID"},
-                    "workspaceId": {"type": "string", "description": "Source workspace ID"},
-                    "newName": {
-                        "type": "string",
-                        "description": "Name for the new document",
-                    },
-                    "isPublic": {
-                        "type": "boolean",
-                        "description": (
-                            "Whether the new document should be public. Defaults to true: "
-                            "free Onshape accounts can only create public documents "
-                            "and get HTTP 409 otherwise"
-                        ),
-                        "default": True,
-                    },
-                },
-                "required": ["documentId", "workspaceId", "newName"],
-            },
-        ),
-        Tool(
-            name="delete_workspace",
-            description=(
-                "Delete a workspace (branch) from a document. The main workspace cannot "
-                "be deleted. Use together with copy_workspace_to_document to move a branch "
-                "into its own project."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID to delete"},
-                },
-                "required": ["documentId", "workspaceId"],
-            },
-        ),
-        Tool(
-            name="create_part_studio",
-            description="Create a new Part Studio in an existing document",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "name": {"type": "string", "description": "Name for the new Part Studio"},
-                },
-                "required": ["documentId", "workspaceId", "name"],
-            },
-        ),
-        # === Assembly Tools ===
-        Tool(
-            name="create_assembly",
-            description="Create a new Assembly in an existing document",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "name": {"type": "string", "description": "Name for the new Assembly"},
-                },
-                "required": ["documentId", "workspaceId", "name"],
-            },
-        ),
-        Tool(
-            name="add_assembly_instance",
-            description="Add a part or sub-assembly instance to an assembly",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "partStudioElementId": {
-                        "type": "string",
-                        "description": "Element ID of the Part Studio or Assembly to instance",
-                    },
-                    "partId": {
-                        "type": "string",
-                        "description": "Optional specific part ID. If omitted, instances entire Part Studio.",
-                    },
-                    "isAssembly": {
-                        "type": "boolean",
-                        "description": "Whether to instance an assembly (vs a part studio)",
-                        "default": False,
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "partStudioElementId"],
-            },
-        ),
-        Tool(
-            name="transform_instance",
-            description="Apply a RELATIVE transform to an assembly instance (inches and degrees). Note: fails on fixed/grounded instances — use get_assembly_positions to check the 'fixed' flag first.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "instanceId": {"type": "string", "description": "Instance ID to transform"},
-                    "translateX": {
-                        "type": "number",
-                        "description": "X translation in inches",
-                        "default": 0,
-                    },
-                    "translateY": {
-                        "type": "number",
-                        "description": "Y translation in inches",
-                        "default": 0,
-                    },
-                    "translateZ": {
-                        "type": "number",
-                        "description": "Z translation in inches",
-                        "default": 0,
-                    },
-                    "rotateX": {
-                        "type": "number",
-                        "description": "X rotation in degrees",
-                        "default": 0,
-                    },
-                    "rotateY": {
-                        "type": "number",
-                        "description": "Y rotation in degrees",
-                        "default": 0,
-                    },
-                    "rotateZ": {
-                        "type": "number",
-                        "description": "Z rotation in degrees",
-                        "default": 0,
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "instanceId"],
-            },
-        ),
-        Tool(
-            name="create_fastened_mate",
-            description="Create a fastened (rigid) mate between two assembly instances. Requires face IDs from Part Studio body details to place mate connectors on specific faces. Optional offsets shift connectors from face centers (in the face's local XY plane + Z along normal).",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "name": {
-                        "type": "string",
-                        "description": "Mate name",
-                        "default": "Fastened mate",
-                    },
-                    "firstInstanceId": {"type": "string", "description": "First instance ID"},
-                    "secondInstanceId": {"type": "string", "description": "Second instance ID"},
-                    "firstFaceId": {
-                        "type": "string",
-                        "description": "Face deterministic ID on the first instance (from body details)",
-                    },
-                    "secondFaceId": {
-                        "type": "string",
-                        "description": "Face deterministic ID on the second instance (from body details)",
-                    },
-                    "firstOffsetX": {
-                        "type": "number",
-                        "description": "First connector X offset from face center in inches",
-                        "default": 0,
-                    },
-                    "firstOffsetY": {
-                        "type": "number",
-                        "description": "First connector Y offset from face center in inches",
-                        "default": 0,
-                    },
-                    "firstOffsetZ": {
-                        "type": "number",
-                        "description": "First connector Z offset (along face normal) in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetX": {
-                        "type": "number",
-                        "description": "Second connector X offset from face center in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetY": {
-                        "type": "number",
-                        "description": "Second connector Y offset from face center in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetZ": {
-                        "type": "number",
-                        "description": "Second connector Z offset (along face normal) in inches",
-                        "default": 0,
-                    },
-                },
-                "required": [
-                    "documentId",
-                    "workspaceId",
-                    "elementId",
-                    "firstInstanceId",
-                    "secondInstanceId",
-                    "firstFaceId",
-                    "secondFaceId",
-                ],
-            },
-        ),
-        Tool(
-            name="create_revolute_mate",
-            description="Create a revolute (rotation) mate between two assembly instances. The first instance rotates relative to the second around the mate connector Z-axis. Requires face IDs from Part Studio body details. Optional offsets shift connectors from face centers.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "name": {
-                        "type": "string",
-                        "description": "Mate name",
-                        "default": "Revolute mate",
-                    },
-                    "firstInstanceId": {"type": "string", "description": "First instance ID"},
-                    "secondInstanceId": {"type": "string", "description": "Second instance ID"},
-                    "firstFaceId": {
-                        "type": "string",
-                        "description": "Face deterministic ID on the first instance",
-                    },
-                    "secondFaceId": {
-                        "type": "string",
-                        "description": "Face deterministic ID on the second instance",
-                    },
-                    "minLimit": {
-                        "type": "number",
-                        "description": "Optional minimum rotation limit in degrees",
-                    },
-                    "maxLimit": {
-                        "type": "number",
-                        "description": "Optional maximum rotation limit in degrees",
-                    },
-                    "firstOffsetX": {
-                        "type": "number",
-                        "description": "First connector X offset in inches",
-                        "default": 0,
-                    },
-                    "firstOffsetY": {
-                        "type": "number",
-                        "description": "First connector Y offset in inches",
-                        "default": 0,
-                    },
-                    "firstOffsetZ": {
-                        "type": "number",
-                        "description": "First connector Z offset in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetX": {
-                        "type": "number",
-                        "description": "Second connector X offset in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetY": {
-                        "type": "number",
-                        "description": "Second connector Y offset in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetZ": {
-                        "type": "number",
-                        "description": "Second connector Z offset in inches",
-                        "default": 0,
-                    },
-                },
-                "required": [
-                    "documentId",
-                    "workspaceId",
-                    "elementId",
-                    "firstInstanceId",
-                    "secondInstanceId",
-                    "firstFaceId",
-                    "secondFaceId",
-                ],
-            },
-        ),
-        Tool(
-            name="create_slider_mate",
-            description="Create a slider (linear motion) mate between two assembly instances. The first instance slides relative to the second — positive travel moves the first instance along the face normal direction away from the second. Swap instance order to reverse slide direction. Requires face IDs from Part Studio body details. Optional offsets shift connectors from face centers.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "name": {
-                        "type": "string",
-                        "description": "Mate name",
-                        "default": "Slider mate",
-                    },
-                    "firstInstanceId": {"type": "string", "description": "First instance ID"},
-                    "secondInstanceId": {"type": "string", "description": "Second instance ID"},
-                    "firstFaceId": {
-                        "type": "string",
-                        "description": "Face deterministic ID on the first instance",
-                    },
-                    "secondFaceId": {
-                        "type": "string",
-                        "description": "Face deterministic ID on the second instance",
-                    },
-                    "minLimit": {
-                        "type": "number",
-                        "description": "Optional minimum travel limit in inches",
-                    },
-                    "maxLimit": {
-                        "type": "number",
-                        "description": "Optional maximum travel limit in inches",
-                    },
-                    "firstOffsetX": {
-                        "type": "number",
-                        "description": "First connector X offset in inches",
-                        "default": 0,
-                    },
-                    "firstOffsetY": {
-                        "type": "number",
-                        "description": "First connector Y offset in inches",
-                        "default": 0,
-                    },
-                    "firstOffsetZ": {
-                        "type": "number",
-                        "description": "First connector Z offset in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetX": {
-                        "type": "number",
-                        "description": "Second connector X offset in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetY": {
-                        "type": "number",
-                        "description": "Second connector Y offset in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetZ": {
-                        "type": "number",
-                        "description": "Second connector Z offset in inches",
-                        "default": 0,
-                    },
-                },
-                "required": [
-                    "documentId",
-                    "workspaceId",
-                    "elementId",
-                    "firstInstanceId",
-                    "secondInstanceId",
-                    "firstFaceId",
-                    "secondFaceId",
-                ],
-            },
-        ),
-        Tool(
-            name="create_cylindrical_mate",
-            description="Create a cylindrical (slide + rotate) mate between two assembly instances. The first instance slides and rotates relative to the second along the mate connector Z-axis. Requires face IDs from Part Studio body details. Optional offsets shift connectors from face centers.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "name": {
-                        "type": "string",
-                        "description": "Mate name",
-                        "default": "Cylindrical mate",
-                    },
-                    "firstInstanceId": {"type": "string", "description": "First instance ID"},
-                    "secondInstanceId": {"type": "string", "description": "Second instance ID"},
-                    "firstFaceId": {
-                        "type": "string",
-                        "description": "Face deterministic ID on the first instance",
-                    },
-                    "secondFaceId": {
-                        "type": "string",
-                        "description": "Face deterministic ID on the second instance",
-                    },
-                    "minLimit": {
-                        "type": "number",
-                        "description": "Optional minimum axial travel limit in inches",
-                    },
-                    "maxLimit": {
-                        "type": "number",
-                        "description": "Optional maximum axial travel limit in inches",
-                    },
-                    "firstOffsetX": {
-                        "type": "number",
-                        "description": "First connector X offset in inches",
-                        "default": 0,
-                    },
-                    "firstOffsetY": {
-                        "type": "number",
-                        "description": "First connector Y offset in inches",
-                        "default": 0,
-                    },
-                    "firstOffsetZ": {
-                        "type": "number",
-                        "description": "First connector Z offset in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetX": {
-                        "type": "number",
-                        "description": "Second connector X offset in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetY": {
-                        "type": "number",
-                        "description": "Second connector Y offset in inches",
-                        "default": 0,
-                    },
-                    "secondOffsetZ": {
-                        "type": "number",
-                        "description": "Second connector Z offset in inches",
-                        "default": 0,
-                    },
-                },
-                "required": [
-                    "documentId",
-                    "workspaceId",
-                    "elementId",
-                    "firstInstanceId",
-                    "secondInstanceId",
-                    "firstFaceId",
-                    "secondFaceId",
-                ],
-            },
-        ),
-        Tool(
-            name="create_mate_connector",
-            description="Create an explicit mate connector on a face of an assembly instance. The connector is placed at the face center with its Z-axis along the face normal. Offsets are in the connector's LOCAL coordinate system (X/Y in-plane, Z along normal). Flipping the Z-axis also reverses the other axes via the right-hand rule, which affects how offset translations map to world space.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "instanceId": {
-                        "type": "string",
-                        "description": "Instance ID to attach the connector to",
-                    },
-                    "faceId": {
-                        "type": "string",
-                        "description": "Face deterministic ID (from Part Studio body details)",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Mate connector name",
-                        "default": "Mate connector",
-                    },
-                    "flipPrimary": {
-                        "type": "boolean",
-                        "description": "Flip the primary (Z) axis direction",
-                        "default": False,
-                    },
-                    "secondaryAxisType": {
-                        "type": "string",
-                        "enum": ["PLUS_X", "PLUS_Y", "MINUS_X", "MINUS_Y"],
-                        "description": "Reorient secondary axis",
-                        "default": "PLUS_X",
-                    },
-                    "offsetX": {
-                        "type": "number",
-                        "description": "X offset from face center in inches",
-                        "default": 0,
-                    },
-                    "offsetY": {
-                        "type": "number",
-                        "description": "Y offset from face center in inches",
-                        "default": 0,
-                    },
-                    "offsetZ": {
-                        "type": "number",
-                        "description": "Z offset (along face normal) from face center in inches",
-                        "default": 0,
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "instanceId", "faceId"],
-            },
-        ),
-        # === Sketch Tools ===
-        Tool(
-            name="create_sketch_circle",
-            description="Create a circular sketch on a standard plane",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {"type": "string", "description": "Sketch name", "default": "Sketch"},
-                    "plane": {
-                        "type": "string",
-                        "enum": ["Front", "Top", "Right"],
-                        "description": "Sketch plane",
-                        "default": "Front",
-                    },
-                    "centerX": {
-                        "type": "number",
-                        "description": "Center X in inches",
-                        "default": 0,
-                    },
-                    "centerY": {
-                        "type": "number",
-                        "description": "Center Y in inches",
-                        "default": 0,
-                    },
-                    "radius": {"type": "number", "description": "Radius in inches"},
-                },
-                "required": ["documentId", "workspaceId", "elementId", "radius"],
-            },
-        ),
-        Tool(
-            name="create_sketch_line",
-            description="Create a line sketch on a standard plane",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {"type": "string", "description": "Sketch name", "default": "Sketch"},
-                    "plane": {
-                        "type": "string",
-                        "enum": ["Front", "Top", "Right"],
-                        "description": "Sketch plane",
-                        "default": "Front",
-                    },
-                    "startPoint": {
-                        "type": "array",
-                        "items": {"type": "number"},
-                        "minItems": 2,
-                        "maxItems": 2,
-                        "description": "Start point [x, y] in inches",
-                    },
-                    "endPoint": {
-                        "type": "array",
-                        "items": {"type": "number"},
-                        "minItems": 2,
-                        "maxItems": 2,
-                        "description": "End point [x, y] in inches",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "startPoint", "endPoint"],
-            },
-        ),
-        Tool(
-            name="create_sketch_arc",
-            description="Create an arc sketch on a standard plane",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {"type": "string", "description": "Sketch name", "default": "Sketch"},
-                    "plane": {
-                        "type": "string",
-                        "enum": ["Front", "Top", "Right"],
-                        "description": "Sketch plane",
-                        "default": "Front",
-                    },
-                    "centerX": {
-                        "type": "number",
-                        "description": "Center X in inches",
-                        "default": 0,
-                    },
-                    "centerY": {
-                        "type": "number",
-                        "description": "Center Y in inches",
-                        "default": 0,
-                    },
-                    "radius": {"type": "number", "description": "Radius in inches"},
-                    "startAngle": {
-                        "type": "number",
-                        "description": "Start angle in degrees (0 = positive X)",
-                        "default": 0,
-                    },
-                    "endAngle": {
-                        "type": "number",
-                        "description": "End angle in degrees",
-                        "default": 180,
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "radius"],
-            },
-        ),
-        # === Feature Tools ===
-        Tool(
-            name="create_fillet",
-            description="Create a fillet (rounded edge) on one or more edges",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {"type": "string", "description": "Fillet name", "default": "Fillet"},
-                    "radius": {"type": "number", "description": "Fillet radius in inches"},
-                    "edgeIds": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Deterministic IDs of edges to fillet",
-                    },
-                    "variableRadius": {
-                        "type": "string",
-                        "description": "Optional variable name for radius",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "radius", "edgeIds"],
-            },
-        ),
-        Tool(
-            name="create_chamfer",
-            description="Create a chamfer (beveled edge) on one or more edges",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {"type": "string", "description": "Chamfer name", "default": "Chamfer"},
-                    "distance": {"type": "number", "description": "Chamfer distance in inches"},
-                    "edgeIds": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Deterministic IDs of edges to chamfer",
-                    },
-                    "variableDistance": {
-                        "type": "string",
-                        "description": "Optional variable name for distance",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "distance", "edgeIds"],
-            },
-        ),
-        Tool(
-            name="create_revolve",
-            description="Create a revolve feature by rotating a sketch around an axis",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {"type": "string", "description": "Revolve name", "default": "Revolve"},
-                    "sketchFeatureId": {"type": "string", "description": "ID of sketch to revolve"},
-                    "axis": {
-                        "type": "string",
-                        "enum": ["X", "Y", "Z"],
-                        "description": "Axis of revolution",
-                        "default": "Y",
-                    },
-                    "angle": {
-                        "type": "number",
-                        "description": "Revolve angle in degrees",
-                        "default": 360,
-                    },
-                    "operationType": {
-                        "type": "string",
-                        "enum": ["NEW", "ADD", "REMOVE", "INTERSECT"],
-                        "description": "Revolve operation type",
-                        "default": "NEW",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "sketchFeatureId"],
-            },
-        ),
-        Tool(
-            name="create_linear_pattern",
-            description="Create a linear pattern of features",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {
-                        "type": "string",
-                        "description": "Pattern name",
-                        "default": "Linear pattern",
-                    },
-                    "featureIds": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Feature IDs to pattern",
-                    },
-                    "distance": {
-                        "type": "number",
-                        "description": "Distance between instances in inches",
-                    },
-                    "count": {
-                        "type": "integer",
-                        "description": "Total number of instances",
-                        "default": 2,
-                    },
-                    "direction": {
-                        "type": "string",
-                        "enum": ["X", "Y", "Z"],
-                        "description": "Pattern direction axis",
-                        "default": "X",
-                    },
-                    "reapplyFeatures": {
-                        "type": "boolean",
-                        "description": "Re-run the patterned features per instance (Onshape's 'Reapply features'). Turn on if the pattern fails with PATTERN_SWITCH_TO_PER_INSTANCE because the patterned body was later filleted, chamfered or booleaned",
-                        "default": False,
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "featureIds", "distance"],
-            },
-        ),
-        Tool(
-            name="create_circular_pattern",
-            description="Create a circular pattern of features around an axis",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {
-                        "type": "string",
-                        "description": "Pattern name",
-                        "default": "Circular pattern",
-                    },
-                    "featureIds": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Feature IDs to pattern",
-                    },
-                    "count": {"type": "integer", "description": "Total number of instances"},
-                    "angle": {
-                        "type": "number",
-                        "description": "Total angle spread in degrees",
-                        "default": 360,
-                    },
-                    "axis": {
-                        "type": "string",
-                        "enum": ["X", "Y", "Z"],
-                        "description": "Pattern axis",
-                        "default": "Z",
-                    },
-                    "reapplyFeatures": {
-                        "type": "boolean",
-                        "description": "Re-run the patterned features per instance (Onshape's 'Reapply features'). Turn on if the pattern fails with PATTERN_SWITCH_TO_PER_INSTANCE because the patterned body was later filleted, chamfered or booleaned",
-                        "default": False,
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "featureIds", "count"],
-            },
-        ),
-        Tool(
-            name="create_boolean",
-            description="Perform a boolean operation (union, subtract, intersect) on bodies",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "name": {"type": "string", "description": "Boolean name", "default": "Boolean"},
-                    "booleanType": {
-                        "type": "string",
-                        "enum": ["UNION", "SUBTRACT", "INTERSECT"],
-                        "description": "Boolean operation type",
-                    },
-                    "toolBodyIds": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Deterministic IDs of tool bodies",
-                    },
-                    "targetBodyIds": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Deterministic IDs of target bodies (for SUBTRACT/INTERSECT)",
-                    },
-                },
-                "required": [
-                    "documentId",
-                    "workspaceId",
-                    "elementId",
-                    "booleanType",
-                    "toolBodyIds",
-                ],
-            },
-        ),
-        # === FeatureScript Tools ===
-        Tool(
-            name="eval_featurescript",
-            description="Evaluate a FeatureScript expression in a Part Studio (read-only, for querying geometry)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "script": {
-                        "type": "string",
-                        "description": "FeatureScript lambda expression to evaluate",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "script"],
-            },
-        ),
-        Tool(
-            name="get_bounding_box",
-            description="Get the tight bounding box of all parts in a Part Studio",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        # === Export Tools ===
-        Tool(
-            name="export_part_studio",
-            description="Export a Part Studio to STL, STEP, or other format",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "format": {
-                        "type": "string",
-                        "enum": ["STL", "STEP", "PARASOLID", "GLTF", "OBJ"],
-                        "description": "Export format",
-                        "default": "STL",
-                    },
-                    "partId": {
-                        "type": "string",
-                        "description": "Optional specific part ID to export",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        Tool(
-            name="export_assembly",
-            description="Export an Assembly to STL, STEP, or other format",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "format": {
-                        "type": "string",
-                        "enum": ["STL", "STEP", "GLTF"],
-                        "description": "Export format",
-                        "default": "STL",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        # === Visual Verification Tools ===
-        Tool(
-            name="capture_part_studio_screenshot",
-            description="Render a shaded-view screenshot of a Part Studio's current geometry (for visual verification)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                    "view": {
-                        "type": "string",
-                        "description": "iso/isometric, a named view (top/bottom/front/back/left/right), or a raw 12-number view matrix",
-                        "default": "iso",
-                    },
-                    "outputWidth": {
-                        "type": "integer",
-                        "description": "Image width in pixels",
-                        "default": 800,
-                    },
-                    "outputHeight": {
-                        "type": "integer",
-                        "description": "Image height in pixels",
-                        "default": 600,
-                    },
-                    "showAllParts": {
-                        "type": "boolean",
-                        "description": "Show all parts regardless of visibility settings",
-                        "default": True,
-                    },
-                    "outputPath": {
-                        "type": "string",
-                        "description": "Optional local file path to also save the PNG to",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        Tool(
-            name="capture_assembly_screenshot",
-            description="Render a shaded-view screenshot of an Assembly's current geometry (for visual verification)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "view": {
-                        "type": "string",
-                        "description": "iso/isometric, a named view (top/bottom/front/back/left/right), or a raw 12-number view matrix",
-                        "default": "iso",
-                    },
-                    "outputWidth": {
-                        "type": "integer",
-                        "description": "Image width in pixels",
-                        "default": 800,
-                    },
-                    "outputHeight": {
-                        "type": "integer",
-                        "description": "Image height in pixels",
-                        "default": 600,
-                    },
-                    "showAllParts": {
-                        "type": "boolean",
-                        "description": "Show all parts regardless of visibility settings",
-                        "default": True,
-                    },
-                    "outputPath": {
-                        "type": "string",
-                        "description": "Optional local file path to also save the PNG to",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        Tool(
-            name="check_assembly_interference",
-            description="Check for overlapping/interfering parts in an assembly using bounding box detection. Returns which parts overlap and by how much.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        Tool(
-            name="get_assembly_positions",
-            description="Get positions, sizes, and world-space bounds of all instances in an assembly (in inches)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        Tool(
-            name="set_instance_position",
-            description="Set an instance to an ABSOLUTE position in inches (unlike transform_instance which is relative). Resets rotation to identity. Note: fails on fixed/grounded instances (API returns 400).",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "instanceId": {"type": "string", "description": "Instance ID to position"},
-                    "x": {"type": "number", "description": "Absolute X position in inches"},
-                    "y": {"type": "number", "description": "Absolute Y position in inches"},
-                    "z": {"type": "number", "description": "Absolute Z position in inches"},
-                },
-                "required": ["documentId", "workspaceId", "elementId", "instanceId", "x", "y", "z"],
-            },
-        ),
-        Tool(
-            name="align_instance_to_face",
-            description="Position source instance flush against a face of target instance. Faces: front (min Y), back (max Y), left (min X), right (max X), bottom (min Z), top (max Z). Only moves the perpendicular axis; other axes stay unchanged.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "sourceInstanceId": {"type": "string", "description": "Instance ID to move"},
-                    "targetInstanceId": {
-                        "type": "string",
-                        "description": "Instance ID to align against",
-                    },
-                    "face": {
-                        "type": "string",
-                        "enum": ["front", "back", "left", "right", "top", "bottom"],
-                        "description": "Face of target to align source against",
-                    },
-                },
-                "required": [
-                    "documentId",
-                    "workspaceId",
-                    "elementId",
-                    "sourceInstanceId",
-                    "targetInstanceId",
-                    "face",
-                ],
-            },
-        ),
-        Tool(
-            name="get_body_details",
-            description="Get face-level geometry details for all parts in a Part Studio. Returns face deterministic IDs, surface types (PLANE, CYLINDER, etc.), and for planar faces: normal vectors and origin points. Use face IDs with mate connector tools.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Part Studio element ID"},
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        Tool(
-            name="get_assembly_features",
-            description="Get all features (mates, mate connectors, etc.) from an assembly with their current state (OK, ERROR, SUPPRESSED). Useful for inspecting existing mates and debugging assembly issues.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                },
-                "required": ["documentId", "workspaceId", "elementId"],
-            },
-        ),
-        Tool(
-            name="get_face_coordinate_system",
-            description=(
-                "Query the true outward-facing coordinate system for a face on an assembly instance. "
-                "Returns the guaranteed outward normal (Z-axis), tangent axes (X/Y), and origin. "
-                "More reliable than body details normals. Use this to verify face orientations before creating mates."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "documentId": {"type": "string", "description": "Document ID"},
-                    "workspaceId": {"type": "string", "description": "Workspace ID"},
-                    "elementId": {"type": "string", "description": "Assembly element ID"},
-                    "instanceId": {
-                        "type": "string",
-                        "description": "Instance ID containing the face",
-                    },
-                    "faceId": {
-                        "type": "string",
-                        "description": "Face deterministic ID (from body details)",
-                    },
-                },
-                "required": ["documentId", "workspaceId", "elementId", "instanceId", "faceId"],
-            },
-        ),
+        ResourceTemplate(
+            name="operation-schema",
+            uriTemplate="onshape://schemas/{operationId}",
+            description="Reviewed OpenAPI schema for one operation.",
+            mimeType="application/json",
+        )
     ]
+
+
+@app.read_resource()
+async def read_resource(uri: Any) -> str:
+    """Read one reviewed operation schema through the gateway."""
+    prefix = "onshape://schemas/"
+    uri_text = str(uri)
+    if not uri_text.startswith(prefix):
+        raise ValueError("unsupported resource URI")
+    operation_id = uri_text[len(prefix) :]
+    result = openapi_gateway.schema(operation_id)
+    if not result.ok:
+        raise ValueError(result.summary)
+    return json.dumps(result.data, default=str)
 
 
 METERS_TO_INCHES = 1 / 0.0254
@@ -1700,6 +409,269 @@ def _sanitize_args(arguments: Any, max_length: int = 500) -> str:
     return text if len(text) <= max_length else text[:max_length] + "... (truncated)"
 
 
+def _consolidated_text(result: Any, tool_name: str) -> list[TextContent]:
+    """Encode a structured domain result as one MCP text item."""
+    if hasattr(result, "model_dump"):
+        payload = result.model_dump(mode="json", by_alias=True)
+        if not payload.get("summary"):
+            payload["summary"] = (
+                f"{tool_name} completed" if payload.get("ok") else f"{tool_name} failed"
+            )
+    else:
+        payload = result
+    return [TextContent(type="text", text=json.dumps(payload, default=str))]
+
+
+def _target_from_arguments(arguments: dict[str, Any], *, element: bool = False) -> OnshapeTarget:
+    values = {"documentId": arguments["documentId"]}
+    selectors = ("workspaceId", "versionId", "microversionId")
+    provided = [name for name in selectors if arguments.get(name) is not None]
+    if len(provided) != 1:
+        raise ValueError("exactly one of workspaceId, versionId, or microversionId is required")
+    values[provided[0]] = arguments[provided[0]]
+    if element:
+        values["elementId"] = arguments["elementId"]
+    for identifier in ("partId", "featureId", "instanceId", "mateId"):
+        if arguments.get(identifier) is not None:
+            values[identifier] = arguments[identifier]
+    return OnshapeTarget(**values)
+
+
+async def _call_consolidated_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+    """Dispatch the public consolidated tool surface to domain services."""
+    if name == "search_onshape":
+        result = await discovery_service.search_onshape(
+            arguments.get("resourceKind", "documents"),
+            query=arguments.get("query"),
+            document_id=arguments.get("documentId"),
+            workspace_id=arguments.get("workspaceId"),
+            limit=arguments.get("limit", 20),
+            filter_type=arguments.get("filterType"),
+        )
+    elif name == "get_onshape_context":
+        result = await discovery_service.get_onshape_context(arguments["documentId"])
+    elif name == "inspect_part_studio":
+        result = await partstudio_inspection_service.inspect(
+            _target_from_arguments(arguments, element=True),
+            sections=arguments.get("sections", ["features", "parts", "bodyDetails"]),
+        )
+    elif name == "inspect_assembly":
+        result = await assembly_inspection_service.inspect(
+            _target_from_arguments(arguments, element=True),
+            sections=arguments.get("sections", ["definition", "features"]),
+            include_positions=arguments.get("includePositions", False),
+            include_interference=arguments.get("includeInterference", False),
+        )
+    elif name == "inspect_geometry":
+        result = await geometry_inspection_service.inspect_part_studio(
+            _target_from_arguments(arguments, element=True),
+            include_screenshot=arguments.get("includeScreenshot", False),
+            screenshot_options=arguments.get("screenshotOptions"),
+        )
+    elif name == "get_translation":
+        target = None
+        if arguments.get("documentId") and arguments.get("workspaceId"):
+            target = _target_from_arguments(arguments)
+        result = await translation_service.get_translation(
+            arguments["translationId"],
+            target=target,
+            poll=arguments.get("poll", False),
+            timeout_seconds=arguments.get("timeoutSeconds", 30.0),
+            interval_seconds=arguments.get("intervalSeconds", 1.0),
+        )
+    elif name == "search_featurescript_docs":
+        result = featurescript_workflow_service.search_docs(
+            arguments["query"], limit=arguments.get("limit", 5)
+        )
+    elif name == "test_featurescript":
+        target = _target_from_arguments(arguments, element=True)
+        if arguments.get("compileOperationId"):
+            result = await featurescript_workflow_service.test_source(
+                target,
+                operation_registry,
+                compile_operation_id=arguments["compileOperationId"],
+                path_params=arguments.get("pathParams", {}),
+                compile_body=arguments.get("compileBody"),
+                regenerate_operation_id=arguments.get("regenerateOperationId"),
+                regenerate_path_params=arguments.get("regeneratePathParams"),
+                regenerate_body=arguments.get("regenerateBody"),
+                inspect_geometry=arguments.get("inspectGeometry", False),
+            )
+        else:
+            result = await featurescript_workflow_service.evaluate_expression(
+                target,
+                arguments["script"],
+                inspect_geometry=arguments.get("inspectGeometry", False),
+            )
+    elif name == "get_feature_schema":
+        result = openapi_gateway.schema(arguments["operationId"])
+    elif name == "read_featurescript":
+        result = await featurescript_workflow_service.read_source(
+            _target_from_arguments(arguments, element=True),
+            operation_registry,
+            arguments["operationId"],
+            path_params=arguments.get("pathParams", {}),
+            query_params=arguments.get("queryParams"),
+        )
+    elif name == "write_featurescript":
+        result = await featurescript_workflow_service.write_source(
+            _target_from_arguments(arguments, element=True),
+            operation_registry,
+            arguments["operationId"],
+            path_params=arguments.get("pathParams", {}),
+            body=arguments["body"],
+            expected_revision=arguments.get("expectedRevision"),
+        )
+    elif name == "start_translation":
+        if arguments.get("operationId"):
+            result = await openapi_gateway.mutate(
+                arguments["operationId"],
+                path_params=arguments.get("pathParams"),
+                query_params=arguments.get("queryParams"),
+                body=arguments.get("body"),
+            )
+        else:
+            result = await translation_service.start_translation(
+                _target_from_arguments(arguments, element=True),
+                resource_kind=arguments["resourceKind"],
+                format_name=arguments.get("formatName", "STL"),
+                part_id=arguments.get("partId"),
+            )
+    elif name == "edit_onshape_object":
+        result = await openapi_gateway.mutate(
+            arguments["operationId"],
+            path_params=arguments.get("pathParams"),
+            query_params=arguments.get("queryParams"),
+            body=arguments.get("body"),
+        )
+    elif name == "create_onshape_object":
+        if arguments.get("operationId"):
+            result = await openapi_gateway.mutate(
+                arguments["operationId"],
+                path_params=arguments.get("pathParams"),
+                query_params=arguments.get("queryParams"),
+                body=arguments.get("body", {"name": arguments.get("name")}),
+            )
+        else:
+            result = await object_write_service.create(
+                arguments["kind"],
+                name=arguments["name"],
+                document_id=arguments.get("documentId"),
+                workspace_id=arguments.get("workspaceId"),
+                description=arguments.get("description"),
+                is_public=arguments.get("isPublic", True),
+            )
+    elif name == "edit_sketch":
+        result = await sketch_write_service.edit(
+            _target_from_arguments(arguments, element=True),
+            action=arguments.get("action", "create"),
+            plane=arguments.get("plane", "Front"),
+            plane_id=arguments.get("planeId"),
+            name=arguments.get("name", "Sketch"),
+            entities=arguments.get("entities"),
+            constraints=arguments.get("constraints"),
+            feature_data=arguments.get("featureData"),
+            feature_id=arguments.get("featureId"),
+        )
+    elif name == "edit_part_feature":
+        result = await part_feature_write_service.edit(
+            _target_from_arguments(arguments, element=True),
+            action=arguments.get("action", "create"),
+            feature_data=arguments.get("featureData"),
+            feature_id=arguments.get("featureId"),
+        )
+    elif name == "edit_variables":
+        result = await variable_write_service.edit(
+            _target_from_arguments(arguments, element=True),
+            arguments["variables"],
+        )
+    elif name == "edit_assembly_instance":
+        if arguments.get("operationId"):
+            result = await openapi_gateway.mutate(
+                arguments["operationId"],
+                path_params=arguments.get("pathParams"),
+                query_params=arguments.get("queryParams"),
+                body=arguments.get("payload"),
+            )
+        else:
+            result = await assembly_write_service.edit_instance(
+                _target_from_arguments(arguments, element=True),
+                action=arguments["action"],
+                payload=arguments["payload"],
+            )
+    elif name == "edit_assembly_mate":
+        if arguments.get("operationId"):
+            result = await openapi_gateway.mutate(
+                arguments["operationId"],
+                path_params=arguments.get("pathParams"),
+                query_params=arguments.get("queryParams"),
+                body=arguments.get("featureData"),
+            )
+        else:
+            result = await assembly_write_service.edit_mate(
+                _target_from_arguments(arguments, element=True),
+                action=arguments["action"],
+                feature_data=arguments.get("featureData"),
+                feature_id=arguments.get("featureId"),
+            )
+    elif name == "delete_onshape_object":
+        if arguments.get("planOnly"):
+            try:
+                operation = operation_registry.get(arguments["operationId"])
+                if not operation.is_destructive:
+                    result = ToolResult.failure(
+                        "delete_onshape_object requires a delete-classified operation",
+                        code="DELETE_GATE_REJECTED",
+                    )
+                elif not operation.reviewed:
+                    result = ToolResult.failure(
+                        "destructive operation is not reviewed",
+                        code="REVIEW_REQUIRED",
+                    )
+                else:
+                    result = destructive_gate.plan(
+                        operation_id=operation.operation_id,
+                        resource_kind=arguments["resourceKind"],
+                        target=arguments["target"],
+                        request_body=arguments.get("requestBody"),
+                        identity=arguments["identity"],
+                        ttl_seconds=arguments.get("ttlSeconds"),
+                    )
+            except Exception as exc:
+                result = ToolResult.failure(str(exc), code="INVALID_PLAN")
+        else:
+            result = await openapi_gateway.mutate(
+                arguments["operationId"],
+                path_params=arguments.get("pathParams"),
+                query_params=arguments.get("queryParams"),
+                body=arguments.get("requestBody"),
+                resource_kind=arguments["resourceKind"],
+                target=arguments["target"],
+                plan_token=arguments["planToken"],
+                identity=arguments["identity"],
+            )
+    elif name == "query_onshape_operation":
+        result = await openapi_gateway.query(
+            arguments["operationId"],
+            path_params=arguments.get("pathParams"),
+            query_params=arguments.get("queryParams"),
+        )
+    elif name == "mutate_onshape_operation":
+        result = await openapi_gateway.mutate(
+            arguments["operationId"],
+            path_params=arguments.get("pathParams"),
+            query_params=arguments.get("queryParams"),
+            body=arguments.get("body"),
+            resource_kind=arguments.get("resourceKind"),
+            target=arguments.get("target"),
+            plan_token=arguments.get("planToken"),
+            identity=arguments.get("identity"),
+        )
+    else:
+        raise ValueError(f"Unknown consolidated tool: {name}")
+    return _consolidated_text(result, name)
+
+
 @app.call_tool()
 async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageContent]:
     """Handle tool calls with entry + exception logging.
@@ -1718,6 +690,8 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
 
 async def _call_tool_impl(name: str, arguments: Any) -> list[TextContent | ImageContent]:
     """Dispatch a tool call to its handler."""
+    if name in CONSOLIDATED_TOOL_NAMES:
+        return await _call_consolidated_tool(name, arguments)
 
     if name == "create_sketch_rectangle":
         try:

@@ -1,0 +1,14 @@
+{
+  "authenticated": true,
+  "cleaned": true,
+  "created": true,
+  "operations": {
+    "assembly": true,
+    "create_document": true,
+    "feature_studio": true,
+    "get_elements": true,
+    "get_workspaces": true,
+    "partstudio": true,
+    "variable_studio": true
+  }
+}

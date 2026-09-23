@@ -1,0 +1,2132 @@
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Search documents or list workspaces, elements, and Part Studios.",
+    "inputSchema": {
+      "properties": {
+        "documentId": {
+          "type": "string"
+        },
+        "filterType": {
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "type": "string"
+        },
+        "resourceKind": {
+          "default": "documents",
+          "enum": [
+            "documents",
+            "workspaces",
+            "elements",
+            "partstudios"
+          ],
+          "type": "string"
+        },
+        "workspaceId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "search_onshape"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Get a normalized document, workspace, and element context.",
+    "inputSchema": {
+      "properties": {
+        "documentId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId"
+      ],
+      "type": "object"
+    },
+    "name": "get_onshape_context"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Inspect Part Studio features, parts, and body geometry.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "featureId": {
+          "description": "Onshape feature ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "enum": [
+              "features",
+              "parts",
+              "bodyDetails"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId"
+      ],
+      "type": "object"
+    },
+    "name": "inspect_part_studio"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Inspect Assembly definition, features, positions, and interference.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "featureId": {
+          "description": "Onshape feature ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "includeInterference": {
+          "default": false,
+          "type": "boolean"
+        },
+        "includePositions": {
+          "default": false,
+          "type": "boolean"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "enum": [
+              "definition",
+              "features"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId"
+      ],
+      "type": "object"
+    },
+    "name": "inspect_assembly"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Inspect Part Studio body details and optionally capture a screenshot.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "featureId": {
+          "description": "Onshape feature ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "includeScreenshot": {
+          "default": false,
+          "type": "boolean"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "screenshotOptions": {
+          "type": "object"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId"
+      ],
+      "type": "object"
+    },
+    "name": "inspect_geometry"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read or poll translation status and expose download references.",
+    "inputSchema": {
+      "properties": {
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "featureId": {
+          "description": "Onshape feature ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "intervalSeconds": {
+          "default": 1,
+          "maximum": 60,
+          "minimum": 0.1,
+          "type": "number"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "poll": {
+          "default": false,
+          "type": "boolean"
+        },
+        "timeoutSeconds": {
+          "default": 30,
+          "maximum": 600,
+          "minimum": 1,
+          "type": "number"
+        },
+        "translationId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "translationId"
+      ],
+      "type": "object"
+    },
+    "name": "get_translation"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Search indexed, reviewed FeatureScript documentation excerpts.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 5,
+          "maximum": 20,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "search_featurescript_docs"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Evaluate or compile/regenerate FeatureScript and inspect resulting geometry.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "script"
+          ]
+        },
+        {
+          "required": [
+            "compileOperationId",
+            "pathParams"
+          ]
+        }
+      ],
+      "properties": {
+        "compileBody": {
+          "type": "object"
+        },
+        "compileOperationId": {
+          "type": "string"
+        },
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "featureId": {
+          "description": "Onshape feature ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "inspectGeometry": {
+          "default": false,
+          "type": "boolean"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "pathParams": {
+          "type": "object"
+        },
+        "regenerateBody": {
+          "type": "object"
+        },
+        "regenerateOperationId": {
+          "type": "string"
+        },
+        "regeneratePathParams": {
+          "type": "object"
+        },
+        "script": {
+          "type": "string"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId"
+      ],
+      "type": "object"
+    },
+    "name": "test_featurescript"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Create a supported object kind, or execute a reviewed creation operation.",
+    "inputSchema": {
+      "oneOf": [
+        {
+          "required": [
+            "name"
+          ]
+        },
+        {
+          "required": [
+            "operationId",
+            "body"
+          ]
+        }
+      ],
+      "properties": {
+        "body": {
+          "type": "object"
+        },
+        "description": {
+          "type": "string"
+        },
+        "documentId": {
+          "type": "string"
+        },
+        "isPublic": {
+          "default": true,
+          "type": "boolean"
+        },
+        "kind": {
+          "enum": [
+            "document",
+            "workspace",
+            "version",
+            "partStudio",
+            "assembly",
+            "featureStudio",
+            "variableStudio"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "pathParams": {
+          "type": "object"
+        },
+        "queryParams": {
+          "type": "object"
+        },
+        "workspaceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "name": "create_onshape_object"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Create or update a multi-entity sketch with one domain request.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "action": {
+          "default": "create",
+          "enum": [
+            "create",
+            "update"
+          ],
+          "type": "string"
+        },
+        "constraints": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "entities": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "featureData": {
+          "type": "object"
+        },
+        "featureId": {
+          "type": "string"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "name": {
+          "default": "Sketch",
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "plane": {
+          "default": "Front",
+          "enum": [
+            "Front",
+            "Top",
+            "Right"
+          ],
+          "type": "string"
+        },
+        "planeId": {
+          "type": "string"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId"
+      ],
+      "type": "object"
+    },
+    "name": "edit_sketch"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Create or update a Part Studio feature definition.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "action": {
+          "default": "create",
+          "enum": [
+            "create",
+            "update"
+          ],
+          "type": "string"
+        },
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "featureData": {
+          "type": "object"
+        },
+        "featureId": {
+          "type": "string"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId",
+        "featureData"
+      ],
+      "type": "object"
+    },
+    "name": "edit_part_feature"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Create or update multiple Variable Studio variables.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "featureId": {
+          "description": "Onshape feature ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "variables": {
+          "items": {
+            "required": [
+              "name",
+              "expression"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId",
+        "variables"
+      ],
+      "type": "object"
+    },
+    "name": "edit_variables"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Add, transform, position, align, fix, suppress, or delete an Assembly instance.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "add",
+            "transform",
+            "position",
+            "align",
+            "fix",
+            "unfix",
+            "suppress",
+            "unsuppress",
+            "delete"
+          ],
+          "type": "string"
+        },
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "featureId": {
+          "description": "Onshape feature ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "pathParams": {
+          "type": "object"
+        },
+        "payload": {
+          "type": "object"
+        },
+        "queryParams": {
+          "type": "object"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId",
+        "action",
+        "payload"
+      ],
+      "type": "object"
+    },
+    "name": "edit_assembly_instance"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Create or delete an Assembly mate or mate connector feature.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "create",
+            "update",
+            "delete",
+            "suppress",
+            "unsuppress",
+            "inspect"
+          ],
+          "type": "string"
+        },
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "featureData": {
+          "type": "object"
+        },
+        "featureId": {
+          "type": "string"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "pathParams": {
+          "type": "object"
+        },
+        "queryParams": {
+          "type": "object"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId",
+        "action"
+      ],
+      "type": "object"
+    },
+    "name": "edit_assembly_mate"
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Plan or execute an allowlisted destructive operation.",
+    "inputSchema": {
+      "oneOf": [
+        {
+          "required": [
+            "planToken"
+          ]
+        },
+        {
+          "properties": {
+            "planOnly": {
+              "const": true
+            }
+          },
+          "required": [
+            "planOnly"
+          ]
+        }
+      ],
+      "properties": {
+        "identity": {
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "pathParams": {
+          "type": "object"
+        },
+        "planOnly": {
+          "default": false,
+          "type": "boolean"
+        },
+        "planToken": {
+          "type": "string"
+        },
+        "queryParams": {
+          "type": "object"
+        },
+        "requestBody": {},
+        "resourceKind": {
+          "type": "string"
+        },
+        "target": {
+          "type": "object"
+        },
+        "ttlSeconds": {
+          "maximum": 600,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "operationId",
+        "resourceKind",
+        "target",
+        "identity"
+      ],
+      "type": "object"
+    },
+    "name": "delete_onshape_object"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Retrieve one feature definition schema through a reviewed OpenAPI operation.",
+    "inputSchema": {
+      "properties": {
+        "operationId": {
+          "type": "string"
+        },
+        "pathParams": {
+          "type": "object"
+        },
+        "queryParams": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "operationId"
+      ],
+      "type": "object"
+    },
+    "name": "get_feature_schema"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read Feature Studio source through a reviewed OpenAPI operation.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "featureId": {
+          "description": "Onshape feature ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "pathParams": {
+          "type": "object"
+        },
+        "queryParams": {
+          "type": "object"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId",
+        "operationId"
+      ],
+      "type": "object"
+    },
+    "name": "read_featurescript"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Write Feature Studio source with an optional optimistic revision.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "body": {
+          "type": "object"
+        },
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        },
+        "featureId": {
+          "description": "Onshape feature ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "partId": {
+          "description": "Onshape part ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "pathParams": {
+          "type": "object"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId",
+        "operationId",
+        "body"
+      ],
+      "type": "object"
+    },
+    "name": "write_featurescript"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Start a Part Studio, Assembly, or reviewed translation operation.",
+    "inputSchema": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "microversionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "versionId"
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "workspaceId"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "versionId"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "microversionId"
+              ]
+            }
+          ]
+        }
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "resourceKind"
+          ]
+        },
+        {
+          "required": [
+            "operationId",
+            "body"
+          ]
+        }
+      ],
+      "properties": {
+        "body": {
+          "type": "object"
+        },
+        "documentId": {
+          "description": "Onshape document ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "elementId": {
+          "description": "Onshape element ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "featureId": {
+          "description": "Onshape feature ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "formatName": {
+          "default": "STL",
+          "type": "string"
+        },
+        "instanceId": {
+          "description": "Assembly instance ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "mateId": {
+          "description": "Assembly mate ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "microversionId": {
+          "description": "Onshape microversion ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "partId": {
+          "type": "string"
+        },
+        "pathParams": {
+          "type": "object"
+        },
+        "queryParams": {
+          "type": "object"
+        },
+        "resourceKind": {
+          "enum": [
+            "partstudio",
+            "assembly",
+            "drawing",
+            "blob"
+          ],
+          "type": "string"
+        },
+        "versionId": {
+          "description": "Onshape version ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Onshape workspace ID",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "elementId"
+      ],
+      "type": "object"
+    },
+    "name": "start_translation"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Execute a reviewed non-destructive object lifecycle operation by operationId.",
+    "inputSchema": {
+      "properties": {
+        "body": {},
+        "operationId": {
+          "type": "string"
+        },
+        "pathParams": {
+          "type": "object"
+        },
+        "queryParams": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "operationId"
+      ],
+      "type": "object"
+    },
+    "name": "edit_onshape_object"
+  }
+]

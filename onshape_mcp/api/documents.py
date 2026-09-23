@@ -82,7 +82,9 @@ class DocumentManager:
         if filter_type is not None:
             params["filter"] = filter_type
 
-        response = await self.client.get("/api/v6/documents", params=params)
+        response = await self.client.get(
+            self.client.api_path("/documents", "documents"), params=params
+        )
 
         documents = []
         for doc_data in response.get("items", []):
@@ -123,7 +125,9 @@ class DocumentManager:
         Returns:
             Document information
         """
-        response = await self.client.get(f"/api/v6/documents/{document_id}")
+        response = await self.client.get(
+            self.client.api_path(f"/documents/{document_id}", "documents")
+        )
 
         # Handle thumbnail - can be dict with 'href' or None
         thumbnail_data = response.get("thumbnail")
@@ -158,7 +162,9 @@ class DocumentManager:
         """
         params = {"q": query, "limit": limit}
 
-        response = await self.client.get("/api/v6/documents", params=params)
+        response = await self.client.get(
+            self.client.api_path("/documents", "documents"), params=params
+        )
 
         documents = []
         for doc_data in response.get("items", []):
@@ -194,7 +200,9 @@ class DocumentManager:
         Returns:
             List of workspace information
         """
-        response = await self.client.get(f"/api/v6/documents/d/{document_id}/workspaces")
+        response = await self.client.get(
+            self.client.api_path(f"/documents/d/{document_id}/workspaces", "documents")
+        )
 
         workspaces = []
         for ws_data in response:
@@ -223,7 +231,9 @@ class DocumentManager:
             List of element information
         """
         response = await self.client.get(
-            f"/api/v6/documents/d/{document_id}/w/{workspace_id}/elements"
+            self.client.api_path(
+                f"/documents/d/{document_id}/w/{workspace_id}/elements", "documents"
+            )
         )
 
         elements = []
@@ -290,7 +300,9 @@ class DocumentManager:
             data["description"] = description
         data["isPublic"] = is_public
 
-        response = await self.client.post("/api/v10/documents", data=data)
+        response = await self.client.post(
+            self.client.api_path("/documents", "documents_write"), data=data
+        )
 
         # Handle thumbnail - can be dict with 'href' or None
         thumbnail_data = response.get("thumbnail")
@@ -309,6 +321,21 @@ class DocumentManager:
             description=response.get("description"),
             thumbnail=thumbnail_url,
         )
+
+    async def create_workspace(self, document_id: str, name: str) -> Dict[str, Any]:
+        """Create a workspace branch in a document."""
+        path = self.client.api_path(f"/documents/d/{document_id}/workspaces", "documents_write")
+        return await self.client.post(path, data={"name": name})
+
+    async def create_version(
+        self, document_id: str, name: str, description: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create a version from the document's current workspace."""
+        path = self.client.api_path(f"/documents/d/{document_id}/versions", "documents_write")
+        data: Dict[str, Any] = {"name": name}
+        if description is not None:
+            data["description"] = description
+        return await self.client.post(path, data=data)
 
     async def copy_workspace_to_document(
         self,
@@ -345,7 +372,10 @@ class DocumentManager:
             "repointAppElementVersionRefs": repoint_app_element_version_refs,
         }
         return await self.client.post(
-            f"/api/documents/{document_id}/workspaces/{workspace_id}/copy", data=data
+            self.client.api_path(
+                f"/documents/{document_id}/workspaces/{workspace_id}/copy", "documents"
+            ),
+            data=data,
         )
 
     async def delete_workspace(self, document_id: str, workspace_id: str) -> Dict[str, Any]:
@@ -362,8 +392,15 @@ class DocumentManager:
             Raw response (empty dict on success).
         """
         return await self.client.delete(
-            f"/api/v6/documents/d/{document_id}/workspaces/{workspace_id}"
+            self.client.api_path(
+                f"/documents/d/{document_id}/workspaces/{workspace_id}", "documents_write"
+            )
         )
+
+    async def delete_document(self, document_id: str) -> Dict[str, Any]:
+        """Delete a document by ID."""
+        path = self.client.api_path(f"/documents/{document_id}", "documents_write")
+        return await self.client.delete(path)
 
     async def get_document_summary(self, document_id: str) -> Dict[str, Any]:
         """Get a comprehensive summary of a document including workspaces and elements.

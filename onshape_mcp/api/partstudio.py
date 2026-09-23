@@ -29,7 +29,10 @@ class PartStudioManager:
         Returns:
             Features data
         """
-        path = f"/api/v9/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/features"
+        path = self.client.api_path(
+            f"/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/features",
+            "partstudios",
+        )
         return await self.client.get(path)
 
     async def add_feature(
@@ -46,7 +49,10 @@ class PartStudioManager:
         Returns:
             API response
         """
-        path = f"/api/v9/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/features"
+        path = self.client.api_path(
+            f"/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/features",
+            "partstudios",
+        )
         return await self.client.post(path, data=feature_data)
 
     async def update_feature(
@@ -69,9 +75,9 @@ class PartStudioManager:
         Returns:
             API response
         """
-        path = (
-            f"/api/v9/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}"
-            f"/features/featureid/{feature_id}"
+        path = self.client.api_path(
+            f"/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/features/featureid/{feature_id}",
+            "partstudios",
         )
         return await self.client.post(path, data=feature_data)
 
@@ -89,9 +95,9 @@ class PartStudioManager:
         Returns:
             API response
         """
-        path = (
-            f"/api/v9/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}"
-            f"/features/featureid/{feature_id}"
+        path = self.client.api_path(
+            f"/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/features/featureid/{feature_id}",
+            "partstudios",
         )
         return await self.client.delete(path)
 
@@ -108,7 +114,9 @@ class PartStudioManager:
         Returns:
             List of parts
         """
-        path = f"/api/v9/parts/d/{document_id}/w/{workspace_id}/e/{element_id}"
+        path = self.client.api_path(
+            f"/parts/d/{document_id}/w/{workspace_id}/e/{element_id}", "parts"
+        )
         response = await self.client.get(path)
         return response
 
@@ -126,9 +134,9 @@ class PartStudioManager:
         Returns:
             Bounding box with lowX/Y/Z and highX/Y/Z in meters
         """
-        path = (
-            f"/api/v6/parts/d/{document_id}/w/{workspace_id}"
-            f"/e/{element_id}/partid/{part_id}/boundingboxes"
+        path = self.client.api_path(
+            f"/parts/d/{document_id}/w/{workspace_id}/e/{element_id}/partid/{part_id}/boundingboxes",
+            "parts",
         )
         return await self.client.get(path)
 
@@ -145,7 +153,7 @@ class PartStudioManager:
         Returns:
             API response with new Part Studio info
         """
-        path = f"/api/v9/partstudios/d/{document_id}/w/{workspace_id}"
+        path = self.client.api_path(f"/partstudios/d/{document_id}/w/{workspace_id}", "partstudios")
         data = {"name": name}
         return await self.client.post(path, data=data)
 
@@ -200,5 +208,8 @@ class PartStudioManager:
         Returns:
             Body details data with faces and their geometry
         """
-        path = f"/api/v9/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/bodydetails"
+        path = self.client.api_path(
+            f"/partstudios/d/{document_id}/w/{workspace_id}/e/{element_id}/bodydetails",
+            "partstudios",
+        )
         return await self.client.get(path)

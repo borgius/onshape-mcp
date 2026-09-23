@@ -5,8 +5,8 @@ from unittest.mock import Mock, AsyncMock, patch
 import httpx
 from mcp.types import Tool, TextContent
 
-# Import the server module components
 from onshape_mcp.server import list_tools, call_tool, _extract_offsets
+from onshape_mcp.tools.consolidated import consolidated_tools
 from onshape_mcp.api.variables import Variable
 from onshape_mcp.api.documents import DocumentInfo, ElementInfo
 
@@ -33,129 +33,52 @@ class TestExtractOffsets:
 
 
 class TestListTools:
-    """Test the list_tools handler."""
+    """Test the consolidated MCP tool surface."""
 
     @pytest.mark.asyncio
-    async def test_list_tools_returns_all_tools(self):
-        """Test that list_tools returns all defined tools."""
+    async def test_list_tools_returns_consolidated_tools(self):
+        """The public surface is domain-oriented rather than endpoint-oriented."""
         tools = await list_tools()
+        tool_names = {tool.name for tool in tools}
 
-        assert isinstance(tools, list)
-        assert len(tools) > 0
+        assert len(tools) == 20
         assert all(isinstance(tool, Tool) for tool in tools)
+        assert {
+            "search_onshape",
+            "get_onshape_context",
+            "inspect_part_studio",
+            "inspect_assembly",
+            "inspect_geometry",
+            "get_translation",
+            "search_featurescript_docs",
+            "test_featurescript",
+            "get_feature_schema",
+            "read_featurescript",
+            "write_featurescript",
+            "start_translation",
+            "create_onshape_object",
+            "edit_onshape_object",
+            "edit_sketch",
+            "edit_part_feature",
+            "edit_variables",
+            "edit_assembly_instance",
+            "edit_assembly_mate",
+            "delete_onshape_object",
+        } == tool_names
+        assert "query_onshape_operation" not in tool_names
+        assert "mutate_onshape_operation" not in tool_names
 
-    @pytest.mark.asyncio
-    async def test_list_tools_includes_sketch_tool(self):
-        """Test that create_sketch_rectangle tool is included."""
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
+    def test_advanced_profile_retains_gateway_tools(self):
+        """The opt-in advanced profile exposes both reviewed gateway tools."""
+        tools = consolidated_tools(profile="advanced")
+        tool_names = {tool.name for tool in tools}
 
-        assert "create_sketch_rectangle" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_list_tools_includes_extrude_tool(self):
-        """Test that create_extrude tool is included."""
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-
-        assert "create_extrude" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_list_tools_includes_thicken_tool(self):
-        """Test that create_thicken tool is included."""
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-
-        assert "create_thicken" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_list_tools_includes_variable_tools(self):
-        """Test that variable management tools are included."""
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-
-        assert "get_variables" in tool_names
-        assert "set_variable" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_list_tools_includes_document_tools(self):
-        """Test that document management tools are included."""
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-
-        assert "list_documents" in tool_names
-        assert "search_documents" in tool_names
-        assert "get_document" in tool_names
-        assert "get_document_summary" in tool_names
-        assert "find_part_studios" in tool_names
-        assert "create_document" in tool_names
-        assert "create_part_studio" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_list_tools_includes_partstudio_tools(self):
-        """Test that Part Studio tools are included."""
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-
-        assert "get_features" in tool_names
-        assert "get_parts" in tool_names
-        assert "get_elements" in tool_names
-        assert "get_assembly" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_list_tools_includes_assembly_tools(self):
-        """Test that assembly management tools are included."""
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-
-        assert "create_assembly" in tool_names
-        assert "add_assembly_instance" in tool_names
-        assert "transform_instance" in tool_names
-        assert "create_fastened_mate" in tool_names
-        assert "create_revolute_mate" in tool_names
-        assert "create_slider_mate" in tool_names
-        assert "create_cylindrical_mate" in tool_names
-        assert "create_mate_connector" in tool_names
-        assert "get_body_details" in tool_names
-        assert "get_assembly_features" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_list_tools_includes_feature_tools(self):
-        """Test that feature builder tools are included."""
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-
-        assert "create_sketch_circle" in tool_names
-        assert "create_sketch_line" in tool_names
-        assert "create_sketch_arc" in tool_names
-        assert "create_fillet" in tool_names
-        assert "create_chamfer" in tool_names
-        assert "create_revolve" in tool_names
-        assert "create_linear_pattern" in tool_names
-        assert "create_circular_pattern" in tool_names
-        assert "create_boolean" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_list_tools_includes_featurescript_tools(self):
-        """Test that FeatureScript tools are included."""
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-
-        assert "eval_featurescript" in tool_names
-        assert "get_bounding_box" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_list_tools_includes_export_tools(self):
-        """Test that export tools are included."""
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-
-        assert "export_part_studio" in tool_names
-        assert "export_assembly" in tool_names
+        assert len(tools) == 22
+        assert {"query_onshape_operation", "mutate_onshape_operation"} <= tool_names
 
     @pytest.mark.asyncio
     async def test_tool_schema_structure(self):
-        """Test that tools have proper schema structure."""
+        """Every consolidated tool publishes a usable object schema."""
         tools = await list_tools()
 
         for tool in tools:
@@ -163,7 +86,7 @@ class TestListTools:
             assert hasattr(tool, "description")
             assert hasattr(tool, "inputSchema")
             assert isinstance(tool.inputSchema, dict)
-            assert "type" in tool.inputSchema
+            assert tool.inputSchema["type"] == "object"
             assert "properties" in tool.inputSchema
 
 
@@ -2080,25 +2003,14 @@ class TestExportTools:
 
 
 class TestListToolsPositioning:
-    """Test that positioning tools are registered."""
+    """Positioning behavior is part of the consolidated Assembly tools."""
 
     @pytest.mark.asyncio
-    async def test_includes_get_assembly_positions(self):
+    async def test_inspection_and_edit_tools_cover_positioning(self):
         tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-        assert "get_assembly_positions" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_includes_set_instance_position(self):
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-        assert "set_instance_position" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_includes_align_instance_to_face(self):
-        tools = await list_tools()
-        tool_names = [tool.name for tool in tools]
-        assert "align_instance_to_face" in tool_names
+        tool_names = {tool.name for tool in tools}
+        assert "inspect_assembly" in tool_names
+        assert "edit_assembly_instance" in tool_names
 
 
 class TestGetAssemblyPositionsTool:
